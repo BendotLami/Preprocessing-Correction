@@ -193,8 +193,8 @@ class STGANAgent(object):
             # =================================================================================== #
 
             # compute loss with real images
-            out_src, out_cls = self.D(x_real)
-            d_loss_real = - torch.mean(out_src)
+            out_src, out_cls = self.D(x_real)  # out_src should be 0 - all images are real
+            d_loss_real = - torch.mean(out_src)  # mean of out_src is mean of loss
             d_loss_cls = self.classification_loss(out_cls, label_org)
 
             # compute loss with fake images
