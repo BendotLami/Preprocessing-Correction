@@ -40,9 +40,7 @@ class CustomDataSet(Dataset):
         tensor_image = self.transform(image)
         return tensor_image
 
-
 # class
-
 
 def get_img_lists(file_path):
     glasses_on = []
@@ -62,6 +60,17 @@ def get_img_lists(file_path):
     return glasses_on, glasses_off
 
 
+def fix_glasses(glasses):
+    glasses = glasses.transpose(0, 3, 1, 2)  # z-x-y
+    glasses = glasses / 255
+    glasses_alpha = glasses[:, 3, :, :]
+    to_delete = np.where(glasses_alpha == 0)
+    glasses[to_delete[0], :, to_delete[1], to_delete[2]] = 0
+    glasses = glasses[:, :3, :, :]
+    glasses = glasses.astype(np.float32)
+
+    return glasses
+
 if __name__ == "__main__":
     # plt.ion()   # interactive mode
     TRANSFORM_IMG = torchvision.transforms.Compose([
@@ -74,7 +83,9 @@ if __name__ == "__main__":
 
     dataset_with_glasses = CustomDataSet(CELEB_A_DIR, TRANSFORM_IMG, glasses_on)
     dataset_without_glasses = CustomDataSet(CELEB_A_DIR, TRANSFORM_IMG, glasses_off)
-    glasses = np.load(GLASSES_NPY_DIR)
+
+    glasses = np.load(GLASSES_NPY_DIR)  # x-y-z
+    glasses = fix_glasses(glasses)
 
     agent = ModelAgent(dataset_with_glasses, dataset_without_glasses, glasses, BATCH_SIZE_GLASSES,
                        BATCH_SIZE_WITHOUT_GLASSES)
