@@ -24,7 +24,7 @@ class GeneratorNet(nn.Module):
 
         # Regressor for the 3 * 2 affine matrix
         self.fc_loc = nn.Sequential(
-            nn.Linear(10 * 3 * 3, 32),
+            nn.Linear(10 * 32 * 32, 32),
             nn.ReLU(True),
             nn.Linear(32, 3 * 2)
         )
@@ -35,9 +35,9 @@ class GeneratorNet(nn.Module):
 
     # Spatial transformer network forward function
     def stn(self, FG, BG):
-        full_img = torch.cat([FG, BG], dim=3)
+        full_img = torch.cat([FG, BG], dim=1)
         xs = self.localization(full_img)
-        xs = xs.view(-1, 10 * 3 * 3)
+        xs = xs.view(-1, 10 * 32 * 32)
         theta = self.fc_loc(xs)
         theta = theta.view(-1, 2, 3)
 
@@ -51,9 +51,9 @@ class GeneratorNet(nn.Module):
         FG_after_transform, affine_matrix = self.stn(FG, BG)
 
         # concat FG to BG # TODO: fix this sum
-        concat_img = BG + FG_after_transform
+        concat_img = BG + FG_after_transform[:,:3,:,:]
 
-        return FG_after_transform, affine_matrix
+        return concat_img, affine_matrix
 
 
 class DiscriminatorNet(nn.Module):
