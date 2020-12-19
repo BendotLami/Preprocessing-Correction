@@ -4,8 +4,27 @@ import torch.nn.functional as F
 import torch.optim as optim
 import torch.utils.data as data
 import numpy as np
+import matplotlib.pyplot as plt
 
 from models import *
+
+
+def print_images_to_folder(real_img, fake_img_D, fake_img_G, glasses, path='./debug_outputs/'):
+    for i in range(real_img.shape[0]):
+        real = real_img[i].numpy().transpose(1, 2, 0)
+        real = np.clip(real, 0, 1)
+        fake_d = fake_img_D[i].numpy().transpose(1, 2, 0)
+        fake_d = np.clip(fake_d, 0, 1)
+        fake_g = fake_img_G[i].numpy().transpose(1, 2, 0)
+        fake_g = np.clip(fake_g, 0, 1)
+        glass = glasses[i].numpy().transpose(1, 2, 0)
+        # glass = glass / np.max(glass)
+        glass = np.clip(glass, 0, 1)
+        plt.imsave(str(path + "output_" + str(i) + ".jpg"),
+                   np.concatenate((real, fake_d, fake_g, glass), axis=1))
+    print("Done printing!")
+    exit(0)
+
 
 
 class ModelAgent(object):
@@ -34,7 +53,7 @@ class ModelAgent(object):
     def train_G(self, FG_images, BG_images):
         x_fake, t_matrix = self.model_G(FG_images, BG_images)
         out_src = self.model_D(x_fake)
-        g_loss_adv = out_src
+        g_loss_adv = - out_src
 
         g_loss_geo = torch.linalg.norm(t_matrix)  # L2
         g_loss_geo = torch.pow(g_loss_geo, 2)  # L2 ** 2
@@ -50,6 +69,8 @@ class ModelAgent(object):
         self.optimizer_G.zero_grad()
         g_loss.backward()
         self.optimizer_G.step()
+
+        return x_fake.detach()
 
     def train_D(self, FG_images, BG_images, real_images):
         out_src = self.model_D(real_images)  # out_src should be 0 - all images are real
@@ -72,6 +93,7 @@ class ModelAgent(object):
         d_loss_adv.backward(retain_graph=True)
         self.optimizer_D.step()
 
+        return img_fake.detach()
 
     def train(self):
         train_size = int(0.9 * len(self.dataset_with_glasses))
@@ -90,11 +112,16 @@ class ModelAgent(object):
 
         for epoch in range(10):
             for with_g, without_g in zip(train_data_loader_with, train_data_loader_without):
+                with_g.to(self.device)
+                without_g.to(self.device)
                 glasses_batch = self.glasses[np.random.choice(self.glasses.shape[0], self.batch_size_without_glasses)]
                 glasses_batch = torch.from_numpy(glasses_batch)
+                glasses_batch.to(self.device)
 
-                self.train_D(glasses_batch, without_g, with_g)
-                self.train_G(glasses_batch, without_g)
+                fake_img_D = self.train_D(glasses_batch, without_g, with_g)
+                fake_img_G = self.train_G(glasses_batch, without_g)
+
+                print_images_to_folder(without_g, fake_img_D, fake_img_G, glasses_batch)
 
                 self.lr_scheduler_G.step()
                 self.lr_scheduler_D.step()
