@@ -66,7 +66,7 @@ def fix_glasses(glasses):
     glasses_alpha = glasses[:, 3, :, :]
     to_delete = np.where(glasses_alpha == 0)
     glasses[to_delete[0], :, to_delete[1], to_delete[2]] = 0
-    glasses = glasses[:, :3, :, :]
+    # glasses = glasses[:, :3, :, :]
     glasses = glasses.astype(np.float32)
 
     return glasses

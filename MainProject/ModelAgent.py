@@ -8,8 +8,12 @@ import matplotlib.pyplot as plt
 
 from models import *
 
+# utils functions, move to diff file in future
+image_counter = 0
+
 
 def print_images_to_folder(real_img, fake_img_D, fake_img_G, glasses, path='./debug_outputs/'):
+    global image_counter
     for i in range(real_img.shape[0]):
         real = real_img[i].numpy().transpose(1, 2, 0)
         real = np.clip(real, 0, 1)
@@ -20,11 +24,15 @@ def print_images_to_folder(real_img, fake_img_D, fake_img_G, glasses, path='./de
         glass = glasses[i].numpy().transpose(1, 2, 0)
         # glass = glass / np.max(glass)
         glass = np.clip(glass, 0, 1)
-        plt.imsave(str(path + "output_" + str(i) + ".jpg"),
+        glass = glass[:, :, :3]
+        plt.imsave(str(path + "output_" + str(i) + "_batch_" + str(image_counter) + ".jpg"),
                    np.concatenate((real, fake_d, fake_g, glass), axis=1))
+    image_counter += 1
     print("Done printing!")
-    exit(0)
 
+
+def concatenate_glasses_and_foreground(glasses, BG_images):
+    pass
 
 
 class ModelAgent(object):
@@ -51,14 +59,15 @@ class ModelAgent(object):
         pass
 
     def train_G(self, FG_images, BG_images):
-        x_fake, t_matrix = self.model_G(FG_images, BG_images)
-        out_src = self.model_D(x_fake)
+        glasses_transformed, t_matrix = self.model_G(FG_images, BG_images)
+        fake_images = BG_images + glasses_transformed[:, :3, :, :]
+        out_src = self.model_D(fake_images)
         g_loss_adv = - out_src
 
         g_loss_geo = torch.linalg.norm(t_matrix)  # L2
         g_loss_geo = torch.pow(g_loss_geo, 2)  # L2 ** 2
 
-        # TODO: add loss using [x_fake, BG_images]
+        # TODO: add loss using [glasses_transformed, BG_images]
 
         # target-to-original domain
         # x_reconst = self.model_G(x_real, c_org - c_org)
@@ -66,19 +75,25 @@ class ModelAgent(object):
 
         # backward and optimize
         g_loss = torch.mean(g_loss_adv + g_loss_geo)  # + self.config.lambda3 * g_loss_rec + self.config.lambda2 * g_loss_cls
+        print("train_D loss:", g_loss.item())
         self.optimizer_G.zero_grad()
         g_loss.backward()
         self.optimizer_G.step()
 
-        return x_fake.detach()
+        return fake_images
 
     def train_D(self, FG_images, BG_images, real_images):
         out_src = self.model_D(real_images)  # out_src should be 0 - all images are real
         d_loss_real = - torch.mean(out_src)  # mean of out_src is mean of loss
 
         # compute loss with fake images
-        img_fake, _ = self.model_G(FG_images, BG_images)
-        out_src = self.model_D(img_fake.detach())
+        glasses_transformed, _ = self.model_G(FG_images, BG_images)
+        # fake_images = concatenate_glasses_and_foreground(glasses_transformed.cpu().numpy(),
+        #                                                  BG_images.cpu().numpy())
+
+        fake_images = BG_images + glasses_transformed[:, :3, :, :]
+
+        out_src = self.model_D(fake_images)
         d_loss_fake = torch.mean(out_src)
 
         # compute loss for gradient penalty # TODO: maybe will be useful in the future
@@ -89,11 +104,12 @@ class ModelAgent(object):
 
         # backward and optimize
         d_loss_adv = d_loss_real + d_loss_fake  # + self.config.lambda_gp * d_loss_gp
+        print("train_D loss:", d_loss_adv.item())
         self.optimizer_D.zero_grad()
         d_loss_adv.backward(retain_graph=True)
         self.optimizer_D.step()
 
-        return img_fake.detach()
+        return fake_images
 
     def train(self):
         train_size = int(0.9 * len(self.dataset_with_glasses))
@@ -121,7 +137,7 @@ class ModelAgent(object):
                 fake_img_D = self.train_D(glasses_batch, without_g, with_g)
                 fake_img_G = self.train_G(glasses_batch, without_g)
 
-                print_images_to_folder(without_g, fake_img_D, fake_img_G, glasses_batch)
-
                 self.lr_scheduler_G.step()
                 self.lr_scheduler_D.step()
+
+                print_images_to_folder(without_g.detach(), fake_img_D.detach(), fake_img_G.detach(), glasses_batch.detach())

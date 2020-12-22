@@ -35,7 +35,7 @@ class GeneratorNet(nn.Module):
 
     # Spatial transformer network forward function
     def stn(self, FG, BG):
-        full_img = torch.cat([FG, BG], dim=1)
+        full_img = torch.cat([FG[:, :3, :, :], BG], dim=1)
         xs = self.localization(full_img)
         xs = xs.view(-1, 10 * 32 * 32)
         theta = self.fc_loc(xs)
@@ -51,9 +51,9 @@ class GeneratorNet(nn.Module):
         FG_after_transform, affine_matrix = self.stn(FG, BG)
 
         # concat FG to BG # TODO: fix this sum
-        concat_img = BG + FG_after_transform[:,:3,:,:]
+        # concat_img = BG + FG_after_transform[:,:3,:,:]
 
-        return concat_img, affine_matrix
+        return FG_after_transform, affine_matrix
 
 
 class DiscriminatorNet(nn.Module):
