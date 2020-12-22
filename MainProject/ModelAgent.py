@@ -75,7 +75,7 @@ class ModelAgent(object):
 
         # backward and optimize
         g_loss = torch.mean(g_loss_adv + g_loss_geo)  # + self.config.lambda3 * g_loss_rec + self.config.lambda2 * g_loss_cls
-        print("train_D loss:", g_loss.item())
+        print("train_G loss:", g_loss.item())
         self.optimizer_G.zero_grad()
         g_loss.backward()
         self.optimizer_G.step()

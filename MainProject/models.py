@@ -6,54 +6,51 @@ import torch.nn.functional as F
 class GeneratorNet(nn.Module):
     def __init__(self):
         super(GeneratorNet, self).__init__()
-        # self.conv1 = nn.Conv2d(1, 10, kernel_size=5)
-        # self.conv2 = nn.Conv2d(10, 20, kernel_size=5)
-        # self.conv2_drop = nn.Dropout2d()
-        # self.fc1 = nn.Linear(320, 50)
-        # self.fc2 = nn.Linear(50, 10)
+        self.conv_layers = []
+        in_layers = 7
+        for i in range(4):
+            self.conv_layers.append(nn.Sequential(
+                nn.Conv2d(in_layers, in_layers, 4, 2, 1),
+                nn.ReLU(True)))
+            in_layers += 7
+        self.conv_layers.append(nn.Sequential(
+            nn.Conv2d(in_layers, in_layers, 4, 2, 2),
+            nn.ReLU(True)))
+        in_layers += 7
 
-        # Spatial transformer localization-network
-        self.localization = nn.Sequential(
-            nn.Conv2d(6, 40, kernel_size=7),
-            nn.MaxPool2d(2, stride=2),
-            nn.ReLU(True),
-            nn.Conv2d(40, 10, kernel_size=5),
-            nn.MaxPool2d(2, stride=2),
-            nn.ReLU(True)
-        )
+        self.linear_layer_1 = nn.Sequential(nn.Linear((in_layers)*5*5, 256), nn.ReLU(True))
+        self.linear_layer_2 = nn.Sequential(nn.Linear(256, 6))
 
-        # Regressor for the 3 * 2 affine matrix
-        self.fc_loc = nn.Sequential(
-            nn.Linear(10 * 32 * 32, 32),
-            nn.ReLU(True),
-            nn.Linear(32, 3 * 2)
-        )
-
-        # Initialize the weights/bias with identity transformation
-        self.fc_loc[2].weight.data.zero_()
-        self.fc_loc[2].bias.data.copy_(torch.tensor([1, 0, 0, 0, 1, 0], dtype=torch.float))
-
-    # Spatial transformer network forward function
-    def stn(self, FG, BG):
-        full_img = torch.cat([FG[:, :3, :, :], BG], dim=1)
-        xs = self.localization(full_img)
-        xs = xs.view(-1, 10 * 32 * 32)
-        theta = self.fc_loc(xs)
-        theta = theta.view(-1, 2, 3)
-
-        grid = F.affine_grid(theta, FG.size())
-        FG = F.grid_sample(FG, grid)
-
-        return FG, theta
+    def downsample(self, x):
+        padH, padW = int(x.shape[2]) % 2, int(x.shape[3]) % 2
+        if padH != 0 or padW != 0: x = F.pad(x, [0, padH, 0, padW])  # TODO: make sure it works
+        return torch.nn.AvgPool2d([2, 2], [2, 2])(x)
 
     def forward(self, FG, BG):
         # transform the FG input
-        FG_after_transform, affine_matrix = self.stn(FG, BG)
+        image_concat = torch.cat([FG, BG], dim=1)
+        feat = image_concat # TODO: make sure this is a copy!
+
+        for i in range(len(self.conv_layers)):
+            feat = self.conv_layers[i](feat)
+            image_concat = self.downsample(image_concat)
+            feat = torch.cat([feat, image_concat], dim=1)
+
+        feat = feat.view(feat.size()[0], -1)
+        feat = self.linear_layer_1(feat)
+        feat = self.linear_layer_2(feat)
+
+        theta = feat.view(-1, 2, 3)
+
+        grid = F.affine_grid(theta, FG.size())
+        FG_after_transform = F.grid_sample(FG, grid)
+
+        # FG_after_transform, affine_matrix = self.stn(FG, BG)
 
         # concat FG to BG # TODO: fix this sum
         # concat_img = BG + FG_after_transform[:,:3,:,:]
 
-        return FG_after_transform, affine_matrix
+        return FG_after_transform, theta
 
 
 class DiscriminatorNet(nn.Module):
