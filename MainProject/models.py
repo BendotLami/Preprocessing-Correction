@@ -4,18 +4,18 @@ import torch.nn.functional as F
 
 
 class GeneratorNet(nn.Module):
-    def __init__(self):
+    def __init__(self, device):
         super(GeneratorNet, self).__init__()
         self.conv_layers = []
         in_layers = 7
         for i in range(4):
             self.conv_layers.append(nn.Sequential(
                 nn.Conv2d(in_layers, in_layers, 4, 2, 1),
-                nn.ReLU(True)))
+                nn.ReLU(True)).to(device))
             in_layers += 7
         self.conv_layers.append(nn.Sequential(
             nn.Conv2d(in_layers, in_layers, 4, 2, 2),
-            nn.ReLU(True)))
+            nn.ReLU(True)).to(device))
         in_layers += 7
 
         self.linear_layer_1 = nn.Sequential(nn.Linear((in_layers)*5*5, 256), nn.ReLU(True))

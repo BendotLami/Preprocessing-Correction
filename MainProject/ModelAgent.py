@@ -14,7 +14,7 @@ image_counter = 0
 
 def print_images_to_folder(real_img, fake_img_D, fake_img_G, glasses, path='./debug_outputs/'):
     global image_counter
-    for i in range(real_img.shape[0]):
+    for i in range(5): #range(real_img.shape[0]):
         real = real_img[i].numpy().transpose(1, 2, 0)
         real = np.clip(real, 0, 1)
         fake_d = fake_img_D[i].numpy().transpose(1, 2, 0)
@@ -32,14 +32,16 @@ def print_images_to_folder(real_img, fake_img_D, fake_img_G, glasses, path='./de
 
 
 def concatenate_glasses_and_foreground(glasses, BG_images):
-    pass
+    colorFG,maskFG = glasses[:,:3,:,:], glasses[:,3:,:,:]
+    imageComp = colorFG*maskFG+BG_images*(1-maskFG)
+    return imageComp
 
 
 class ModelAgent(object):
     def __init__(self, dataset_with_glasses, dataset_without_glasses, glasses, batch_size_glasses, batch_size_without_glasses):
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-        self.model_G = GeneratorNet().to(self.device)
+        self.model_G = GeneratorNet(self.device).to(self.device)
         self.optimizer_G = optim.Adam(self.model_G.parameters(), lr=0.01)
         self.lr_scheduler_G = optim.lr_scheduler.StepLR(self.optimizer_G, step_size=800000, gamma=0.1)
 
@@ -59,9 +61,14 @@ class ModelAgent(object):
         pass
 
     def train_G(self, FG_images, BG_images):
+        FG_images = FG_images.to(self.device)
+        BG_images = BG_images.to(self.device)
         glasses_transformed, t_matrix = self.model_G(FG_images, BG_images)
-        fake_images = BG_images + glasses_transformed[:, :3, :, :]
-        out_src = self.model_D(fake_images)
+        glasses_transformed = glasses_transformed.to(self.device)
+        t_matrix = t_matrix.to(self.device)
+        # fake_images = BG_images + glasses_transformed[:, :3, :, :]
+        fake_images = concatenate_glasses_and_foreground(glasses_transformed, BG_images)
+        out_src = self.model_D(fake_images).to(self.device)
         g_loss_adv = - out_src
 
         g_loss_geo = torch.linalg.norm(t_matrix)  # L2
@@ -83,17 +90,22 @@ class ModelAgent(object):
         return fake_images
 
     def train_D(self, FG_images, BG_images, real_images):
-        out_src = self.model_D(real_images)  # out_src should be 0 - all images are real
+        FG_images = FG_images.to(self.device)
+        BG_images = BG_images.to(self.device)
+        real_images = real_images.to(self.device)
+        out_src = self.model_D(real_images).to(self.device)  # out_src should be 0 - all images are real
         d_loss_real = - torch.mean(out_src)  # mean of out_src is mean of loss
 
         # compute loss with fake images
         glasses_transformed, _ = self.model_G(FG_images, BG_images)
+        glasses_transformed = glasses_transformed.to(self.device)
         # fake_images = concatenate_glasses_and_foreground(glasses_transformed.cpu().numpy(),
         #                                                  BG_images.cpu().numpy())
 
-        fake_images = BG_images + glasses_transformed[:, :3, :, :]
+        # fake_images = BG_images + glasses_transformed[:, :3, :, :]
+        fake_images = concatenate_glasses_and_foreground(glasses_transformed, BG_images)
 
-        out_src = self.model_D(fake_images)
+        out_src = self.model_D(fake_images).to(self.device)
         d_loss_fake = torch.mean(out_src)
 
         # compute loss for gradient penalty # TODO: maybe will be useful in the future
@@ -140,4 +152,4 @@ class ModelAgent(object):
                 self.lr_scheduler_G.step()
                 self.lr_scheduler_D.step()
 
-                print_images_to_folder(without_g.detach(), fake_img_D.detach(), fake_img_G.detach(), glasses_batch.detach())
+                print_images_to_folder(without_g.cpu().detach(), fake_img_D.cpu().detach(), fake_img_G.cpu().detach(), glasses_batch.cpu().detach())
