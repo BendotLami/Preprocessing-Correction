@@ -14,7 +14,7 @@ image_counter = 0
 
 def print_images_to_folder(real_img, fake_img_D, fake_img_G, glasses, path='./debug_outputs/'):
     global image_counter
-    for i in range(5): #range(real_img.shape[0]):
+    for i in range(real_img.shape[0]):
         real = real_img[i].numpy().transpose(1, 2, 0)
         real = np.clip(real, 0, 1)
         fake_d = fake_img_D[i].numpy().transpose(1, 2, 0)
@@ -41,7 +41,7 @@ class ModelAgent(object):
     def __init__(self, dataset_with_glasses, dataset_without_glasses, glasses, batch_size_glasses, batch_size_without_glasses):
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-        self.model_G = GeneratorNet(self.device).to(self.device)
+        self.model_G = GeneratorNet().to(self.device)
         self.optimizer_G = optim.Adam(self.model_G.parameters(), lr=0.01)
         self.lr_scheduler_G = optim.lr_scheduler.StepLR(self.optimizer_G, step_size=800000, gamma=0.1)
 
@@ -56,6 +56,25 @@ class ModelAgent(object):
         self.batch_size_glasses = batch_size_glasses
         self.batch_size_without_glasses = batch_size_without_glasses
 
+        # TODO: move to config
+        self.lambda_gp = 10.0
+        self.dplambda = 1.0
+
+
+    def gradient_penalty(self, y, x):
+        """Compute gradient penalty: (L2_norm(dy/dx) - 1)**2."""
+        weight = torch.ones(y.size()).to(self.device)
+        dydx = torch.autograd.grad(outputs=y,
+                                   inputs=x,
+                                   grad_outputs=weight,
+                                   retain_graph=True,
+                                   create_graph=True,
+                                   only_inputs=True)[0]
+
+        dydx = dydx.view(dydx.size(0), -1)
+        dydx_l2norm = torch.sqrt(torch.sum(dydx**2, dim=1))
+        return torch.mean((dydx_l2norm-1)**2)
+
 
     def preprocess_celebA(self, folder_path):
         pass
@@ -63,16 +82,19 @@ class ModelAgent(object):
     def train_G(self, FG_images, BG_images):
         FG_images = FG_images.to(self.device)
         BG_images = BG_images.to(self.device)
-        glasses_transformed, t_matrix = self.model_G(FG_images, BG_images)
+        glasses_transformed, t_matrix, dp = self.model_G(FG_images, BG_images)
         glasses_transformed = glasses_transformed.to(self.device)
         t_matrix = t_matrix.to(self.device)
         # fake_images = BG_images + glasses_transformed[:, :3, :, :]
         fake_images = concatenate_glasses_and_foreground(glasses_transformed, BG_images)
         out_src = self.model_D(fake_images).to(self.device)
-        g_loss_adv = - out_src
+        g_loss_adv = - torch.mean(out_src)
 
-        g_loss_geo = torch.linalg.norm(t_matrix)  # L2
-        g_loss_geo = torch.pow(g_loss_geo, 2)  # L2 ** 2
+        # g_loss_geo = torch.linalg.norm(t_matrix)  # L2
+        # g_loss_geo = torch.pow(g_loss_geo, 2)  # L2 ** 2
+
+        dp_sqnorm = torch.sum(dp**2+1e-8, dim=1)
+        loss_GP_dpnorm = torch.mean(dp_sqnorm)
 
         # TODO: add loss using [glasses_transformed, BG_images]
 
@@ -81,7 +103,7 @@ class ModelAgent(object):
         # g_loss_rec = torch.mean(torch.abs(x_real - x_reconst))
 
         # backward and optimize
-        g_loss = torch.mean(g_loss_adv + g_loss_geo)  # + self.config.lambda3 * g_loss_rec + self.config.lambda2 * g_loss_cls
+        g_loss = g_loss_adv + self.dplambda * loss_GP_dpnorm  # + self.config.lambda3 * g_loss_rec + self.config.lambda2 * g_loss_cls
         print("train_G loss:", g_loss.item())
         self.optimizer_G.zero_grad()
         g_loss.backward()
@@ -94,28 +116,27 @@ class ModelAgent(object):
         BG_images = BG_images.to(self.device)
         real_images = real_images.to(self.device)
         out_src = self.model_D(real_images).to(self.device)  # out_src should be 0 - all images are real
-        d_loss_real = - torch.mean(out_src)  # mean of out_src is mean of loss
+        d_loss_real = torch.mean(out_src)  # mean of out_src is mean of loss
 
         # compute loss with fake images
-        glasses_transformed, _ = self.model_G(FG_images, BG_images)
+        glasses_transformed, _, _ = self.model_G(FG_images, BG_images)
         glasses_transformed = glasses_transformed.to(self.device)
-        # fake_images = concatenate_glasses_and_foreground(glasses_transformed.cpu().numpy(),
-        #                                                  BG_images.cpu().numpy())
-
-        # fake_images = BG_images + glasses_transformed[:, :3, :, :]
         fake_images = concatenate_glasses_and_foreground(glasses_transformed, BG_images)
 
-        out_src = self.model_D(fake_images).to(self.device)
+        out_src = self.model_D(fake_images.detach()).to(self.device)
         d_loss_fake = torch.mean(out_src)
 
         # compute loss for gradient penalty # TODO: maybe will be useful in the future
-        # alpha = torch.rand(x_real.size(0), 1, 1, 1).to(self.device)
-        # x_hat = (alpha * x_real.data + (1 - alpha) * x_fake.data).requires_grad_(True)
-        # out_src, _ = self.D(x_hat)
-        # d_loss_gp = self.gradient_penalty(out_src, x_hat)
+        minimum_batch_size = np.min((fake_images.size(0), real_images.size(0)))
+        x_real = real_images[:minimum_batch_size, :, :, :].detach()
+        x_fake = fake_images[:minimum_batch_size, :, :, :].detach()
+        alpha = torch.rand(x_real.size(0), 1, 1, 1).to(self.device)
+        x_hat = (alpha * x_real.data + (1 - alpha) * x_fake.data).requires_grad_(True)
+        out_src = self.model_D(x_hat).to(self.device)
+        d_loss_gp = self.gradient_penalty(out_src, x_hat)
 
         # backward and optimize
-        d_loss_adv = d_loss_real + d_loss_fake  # + self.config.lambda_gp * d_loss_gp
+        d_loss_adv = d_loss_real + d_loss_fake + self.lambda_gp * d_loss_gp
         print("train_D loss:", d_loss_adv.item())
         self.optimizer_D.zero_grad()
         d_loss_adv.backward(retain_graph=True)
@@ -152,4 +173,6 @@ class ModelAgent(object):
                 self.lr_scheduler_G.step()
                 self.lr_scheduler_D.step()
 
-                print_images_to_folder(without_g.cpu().detach(), fake_img_D.cpu().detach(), fake_img_G.cpu().detach(), glasses_batch.cpu().detach())
+                print("Done batch!")
+
+            print_images_to_folder(without_g.cpu().detach(), fake_img_D.cpu().detach(), fake_img_G.cpu().detach(), glasses_batch.cpu().detach())

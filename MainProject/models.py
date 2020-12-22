@@ -2,21 +2,45 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+class GeneratorConvolutionLayer(nn.Module):
+    def __init__(self, in_layers, out_layers, kernel_size, stride, padding):
+        super(GeneratorConvolutionLayer, self).__init__()
+        self.conv_layer = nn.Sequential(
+            nn.Conv2d(in_layers, out_layers, kernel_size, stride, padding),
+            nn.ReLU(True))
+
+    def downsample(self, x):
+        padH, padW = int(x.shape[2]) % 2, int(x.shape[3]) % 2
+        if padH != 0 or padW != 0: x = F.pad(x, [0, padH, 0, padW])  # TODO: make sure it works
+        return torch.nn.AvgPool2d([2, 2], [2, 2])(x)
+
+    def forward(self, feat, image_concat):
+        feat = self.conv_layer(feat)
+        image_concat = self.downsample(image_concat)
+        feat = torch.cat([feat, image_concat], dim=1)
+        return feat, image_concat
 
 class GeneratorNet(nn.Module):
-    def __init__(self, device):
+    def __init__(self):
         super(GeneratorNet, self).__init__()
-        self.conv_layers = []
+        # self.conv_layers = []
         in_layers = 7
-        for i in range(4):
-            self.conv_layers.append(nn.Sequential(
-                nn.Conv2d(in_layers, in_layers, 4, 2, 1),
-                nn.ReLU(True)).to(device))
-            in_layers += 7
-        self.conv_layers.append(nn.Sequential(
-            nn.Conv2d(in_layers, in_layers, 4, 2, 2),
-            nn.ReLU(True)).to(device))
+        # for i in range(4):
+        #     self.conv_layers.append(GeneratorConvolutionLayer(in_layers, in_layers, 4, 2, 1))
+        #     in_layers += 7
+
+        self.conv1 = GeneratorConvolutionLayer(in_layers, in_layers, 4, 2, 1)
         in_layers += 7
+        self.conv2 = GeneratorConvolutionLayer(in_layers, in_layers, 4, 2, 1)
+        in_layers += 7
+        self.conv3 = GeneratorConvolutionLayer(in_layers, in_layers, 4, 2, 1)
+        in_layers += 7
+        self.conv4 = GeneratorConvolutionLayer(in_layers, in_layers, 4, 2, 1)
+        in_layers += 7
+        self.conv5 = GeneratorConvolutionLayer(in_layers, in_layers, 4, 2, 2)
+
+        in_layers += 7
+        # self.total_conv = nn.Sequential(*self.conv_layers)
 
         self.linear_layer_1 = nn.Sequential(nn.Linear((in_layers)*5*5, 256), nn.ReLU(True))
         self.linear_layer_2 = nn.Sequential(nn.Linear(256, 6))
@@ -29,12 +53,18 @@ class GeneratorNet(nn.Module):
     def forward(self, FG, BG):
         # transform the FG input
         image_concat = torch.cat([FG, BG], dim=1)
-        feat = image_concat # TODO: make sure this is a copy!
+        feat = image_concat  # TODO: make sure this is a copy!
 
-        for i in range(len(self.conv_layers)):
-            feat = self.conv_layers[i](feat)
-            image_concat = self.downsample(image_concat)
-            feat = torch.cat([feat, image_concat], dim=1)
+        feat, image_concat = self.conv1(feat, image_concat)
+        feat, image_concat = self.conv2(feat, image_concat)
+        feat, image_concat = self.conv3(feat, image_concat)
+        feat, image_concat = self.conv4(feat, image_concat)
+        feat, image_concat = self.conv5(feat, image_concat)
+
+        # for i in range(len(self.conv_layers)):
+        #     feat = self.conv_layers[i](feat)
+        #     image_concat = self.downsample(image_concat)
+        #     feat = torch.cat([feat, image_concat], dim=1)
 
         feat = feat.view(feat.size()[0], -1)
         feat = self.linear_layer_1(feat)
@@ -50,32 +80,26 @@ class GeneratorNet(nn.Module):
         # concat FG to BG # TODO: fix this sum
         # concat_img = BG + FG_after_transform[:,:3,:,:]
 
-        return FG_after_transform, theta
+        return FG_after_transform, theta, feat
 
 
 class DiscriminatorNet(nn.Module):
-    def __init__(self, image_size=128, conv_dim=64, fc_dim=1024, n_layers=5):
+    def __init__(self):
         super(DiscriminatorNet, self).__init__()
-        layers = []
-        in_channels = 3
-        for i in range(n_layers):
-            layers.append(nn.Sequential(
-                nn.Conv2d(in_channels, conv_dim * 2 ** i, 4, 2, 1),
-                nn.InstanceNorm2d(conv_dim * 2 ** i, affine=True, track_running_stats=True),
-                nn.LeakyReLU(negative_slope=0.2, inplace=True)
-            ))
-            in_channels = conv_dim * 2 ** i
-        self.conv = nn.Sequential(*layers)
-        feature_size = image_size // 2**n_layers
-        self.fc_adv = nn.Sequential(
-            nn.Linear(conv_dim * 2 ** (n_layers - 1) * feature_size ** 2, fc_dim),
-            nn.LeakyReLU(negative_slope=0.2, inplace=True),
-            nn.Linear(fc_dim, 1)
-        )
+        self.conv_layers = []
+        in_layers = 3
+        for i in range(4):
+            self.conv_layers.append(nn.Conv2d(in_layers, in_layers, 4, 2, 1))
+            self.conv_layers.append(nn.LeakyReLU(True))
+        self.conv_layers.append(nn.Conv2d(in_layers, in_layers, 4, 2, 2))
+        self.conv_layers.append(nn.LeakyReLU(True))
+
+        self.conv_layers.append(nn.Conv2d(in_layers, 1, 5, 1, 0))
+
+        self.total_layers = nn.Sequential(*self.conv_layers)
 
     def forward(self, img):
-        # transform the FG input
-        y = self.conv(img)
-        y = y.view(y.size()[0], -1)
-        logit_adv = self.fc_adv(y)
-        return logit_adv
+        feat = img
+        feat = self.total_layers(feat)
+        score = feat
+        return score
