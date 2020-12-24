@@ -90,5 +90,5 @@ def createVariable(opt,weightShape,biasShape=None,stddev=None):
 # leaky ReLU
 def leakyReLU(input,leak=0.2):
 	with tf.name_scope("leakyReLU"):
-		output = (0.5*(1+leak))*input+(0.5*(1-leak))*tf.abs(input) 
+		output = (0.5*(1+leak))*input+(0.5*(1-leak))*tf.abs(input)
 	return output

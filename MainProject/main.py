@@ -19,7 +19,7 @@ CELEB_A_DIR = "/home/dcor/datasets/CelebAMask-HQ/CelebA-HQ-img/"
 GLASSES_NPY_DIR = "/home/dcor/ronmokady/workshop21/team4/glasses.npy"
 
 BATCH_SIZE_GLASSES = 16
-BATCH_SIZE_WITHOUT_GLASSES = 64
+BATCH_SIZE_WITHOUT_GLASSES = 16
 
 # TODO: move to different file, data.py
 

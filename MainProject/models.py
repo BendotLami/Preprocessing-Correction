@@ -50,9 +50,13 @@ class GeneratorNet(nn.Module):
         if padH != 0 or padW != 0: x = F.pad(x, [0, padH, 0, padW])  # TODO: make sure it works
         return torch.nn.AvgPool2d([2, 2], [2, 2])(x)
 
-    def forward(self, FG, BG):
+    def forward(self, FG, BG, start_feat):
         # transform the FG input
-        image_concat = torch.cat([FG, BG], dim=1)
+        theta = start_feat.view(-1, 2, 3)
+        grid = F.affine_grid(theta, FG.size())
+        FG_start = F.grid_sample(FG, grid)
+
+        image_concat = torch.cat([FG_start, BG], dim=1)
         feat = image_concat  # TODO: make sure this is a copy!
 
         feat, image_concat = self.conv1(feat, image_concat)
@@ -70,7 +74,7 @@ class GeneratorNet(nn.Module):
         feat = self.linear_layer_1(feat)
         feat = self.linear_layer_2(feat)
 
-        theta = feat.view(-1, 2, 3)
+        theta = theta + feat.view(-1, 2, 3)
 
         grid = F.affine_grid(theta, FG.size())
         FG_after_transform = F.grid_sample(FG, grid)

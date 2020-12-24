@@ -57,8 +57,9 @@ class ModelAgent(object):
         self.batch_size_without_glasses = batch_size_without_glasses
 
         # TODO: move to config
-        self.lambda_gp = 10.0
-        self.dplambda = 1.0
+        self.lambda_gp = 0.1
+        self.dplambda = 0.1
+        self.pertFG = 0.1
 
 
     def gradient_penalty(self, y, x):
@@ -82,7 +83,8 @@ class ModelAgent(object):
     def train_G(self, FG_images, BG_images):
         FG_images = FG_images.to(self.device)
         BG_images = BG_images.to(self.device)
-        glasses_transformed, t_matrix, dp = self.model_G(FG_images, BG_images)
+        pPertFG = torch.normal(torch.zeros((self.batch_size_without_glasses, 6)), torch.ones((self.batch_size_without_glasses, 6)) * self.pertFG).to(self.device)
+        glasses_transformed, t_matrix, dp = self.model_G(FG_images, BG_images, pPertFG)
         glasses_transformed = glasses_transformed.to(self.device)
         t_matrix = t_matrix.to(self.device)
         # fake_images = BG_images + glasses_transformed[:, :3, :, :]
@@ -116,10 +118,11 @@ class ModelAgent(object):
         BG_images = BG_images.to(self.device)
         real_images = real_images.to(self.device)
         out_src = self.model_D(real_images).to(self.device)  # out_src should be 0 - all images are real
-        d_loss_real = torch.mean(out_src)  # mean of out_src is mean of loss
+        d_loss_real = - torch.mean(out_src)  # mean of out_src is mean of loss
 
         # compute loss with fake images
-        glasses_transformed, _, _ = self.model_G(FG_images, BG_images)
+        pPertFG = torch.normal(torch.zeros((self.batch_size_without_glasses, 6)), torch.ones((self.batch_size_without_glasses, 6)) * self.pertFG).to(self.device)
+        glasses_transformed, _, _ = self.model_G(FG_images, BG_images, pPertFG)
         glasses_transformed = glasses_transformed.to(self.device)
         fake_images = concatenate_glasses_and_foreground(glasses_transformed, BG_images)
 
@@ -128,8 +131,8 @@ class ModelAgent(object):
 
         # compute loss for gradient penalty # TODO: maybe will be useful in the future
         minimum_batch_size = np.min((fake_images.size(0), real_images.size(0)))
-        x_real = real_images[:minimum_batch_size, :, :, :].detach()
-        x_fake = fake_images[:minimum_batch_size, :, :, :].detach()
+        x_real = real_images[:minimum_batch_size, :, :, :]
+        x_fake = fake_images[:minimum_batch_size, :, :, :]
         alpha = torch.rand(x_real.size(0), 1, 1, 1).to(self.device)
         x_hat = (alpha * x_real.data + (1 - alpha) * x_fake.data).requires_grad_(True)
         out_src = self.model_D(x_hat).to(self.device)
@@ -159,7 +162,7 @@ class ModelAgent(object):
                                                     shuffle=True)
         # test_data_loader = data.DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=True)
 
-        for epoch in range(10):
+        for epoch in range(100):
             for with_g, without_g in zip(train_data_loader_with, train_data_loader_without):
                 with_g.to(self.device)
                 without_g.to(self.device)
@@ -168,6 +171,7 @@ class ModelAgent(object):
                 glasses_batch.to(self.device)
 
                 fake_img_D = self.train_D(glasses_batch, without_g, with_g)
+
                 fake_img_G = self.train_G(glasses_batch, without_g)
 
                 self.lr_scheduler_G.step()
