@@ -23,12 +23,10 @@ class GeneratorConvolutionLayer(nn.Module):
 class GeneratorNet(nn.Module):
     def __init__(self):
         super(GeneratorNet, self).__init__()
-        # self.conv_layers = []
-        in_layers = 7
-        # for i in range(4):
-        #     self.conv_layers.append(GeneratorConvolutionLayer(in_layers, in_layers, 4, 2, 1))
-        #     in_layers += 7
 
+        in_layers = 7
+
+        # geometric transform:
         self.conv1 = GeneratorConvolutionLayer(in_layers, in_layers, 4, 2, 1)
         in_layers += 7
         self.conv2 = GeneratorConvolutionLayer(in_layers, in_layers, 4, 2, 1)
@@ -44,6 +42,10 @@ class GeneratorNet(nn.Module):
 
         self.linear_layer_1 = nn.Sequential(nn.Linear((in_layers)*5*5, 256), nn.ReLU(True))
         self.linear_layer_2 = nn.Sequential(nn.Linear(256, 6))
+
+        # color transform:
+        self.conv1_color = nn.Conv2d(7, 1, 5)
+        self.linear_layer_1_color = nn.Linear(140*140, 6)
 
     def downsample(self, x):
         padH, padW = int(x.shape[2]) % 2, int(x.shape[3]) % 2
@@ -84,7 +86,22 @@ class GeneratorNet(nn.Module):
         # concat FG to BG # TODO: fix this sum
         # concat_img = BG + FG_after_transform[:,:3,:,:]
 
-        return FG_after_transform, theta, feat
+        image_concat_after_transform = torch.cat([FG_after_transform, BG], dim=1)
+
+        feat_color = self.conv1_color(image_concat_after_transform)
+        feat_color = feat_color.view(feat_color.size()[0], -1)
+        feat_color = self.linear_layer_1_color(feat_color)
+
+        # FG_after_transform[:, 0, :, :] = FG_after_transform[:, 0, :, :] * feat_color[:, 0, None, None] + feat_color[:, 1, None, None]
+        # FG_after_transform[:, 1, :, :] = FG_after_transform[:, 1, :, :] * feat_color[:, 2, None, None] + feat_color[:, 3, None, None]
+        # FG_after_transform[:, 2, :, :] = FG_after_transform[:, 2, :, :] * feat_color[:, 4, None, None] + feat_color[:, 5, None, None]
+
+        # lambda_parameters = feat_color[:, :3, None, None]
+        # beta_parameters = feat_color[:, 3:, None, None]
+        #
+        # FG_after_transform[:,:3,:,:] = FG_after_transform[:,:3,:,:] * lambda_parameters + beta_parameters
+
+        return FG_after_transform, theta, feat, feat_color
 
 
 class DiscriminatorNet(nn.Module):

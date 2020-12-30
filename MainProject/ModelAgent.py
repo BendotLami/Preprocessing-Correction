@@ -31,8 +31,9 @@ def print_images_to_folder(real_img, fake_img_D, fake_img_G, glasses, path='./de
     print("Done printing!")
 
 
-def concatenate_glasses_and_foreground(glasses, BG_images):
+def concatenate_glasses_and_foreground(glasses, BG_images, color_params):
     colorFG,maskFG = glasses[:,:3,:,:], glasses[:,3:,:,:]
+    colorFG = colorFG * color_params[:, :3, None, None] + color_params[:, 3:, None, None]
     imageComp = colorFG*maskFG+BG_images*(1-maskFG)
     return imageComp
 
@@ -84,11 +85,11 @@ class ModelAgent(object):
         FG_images = FG_images.to(self.device)
         BG_images = BG_images.to(self.device)
         pPertFG = torch.normal(torch.zeros((self.batch_size_without_glasses, 6)), torch.ones((self.batch_size_without_glasses, 6)) * self.pertFG).to(self.device)
-        glasses_transformed, t_matrix, dp = self.model_G(FG_images, BG_images, pPertFG)
+        glasses_transformed, t_matrix, dp, color_params = self.model_G(FG_images, BG_images, pPertFG)
         glasses_transformed = glasses_transformed.to(self.device)
         t_matrix = t_matrix.to(self.device)
         # fake_images = BG_images + glasses_transformed[:, :3, :, :]
-        fake_images = concatenate_glasses_and_foreground(glasses_transformed, BG_images)
+        fake_images = concatenate_glasses_and_foreground(glasses_transformed, BG_images, color_params)
         out_src = self.model_D(fake_images).to(self.device)
         g_loss_adv = - torch.mean(out_src)
 
@@ -122,9 +123,9 @@ class ModelAgent(object):
 
         # compute loss with fake images
         pPertFG = torch.normal(torch.zeros((self.batch_size_without_glasses, 6)), torch.ones((self.batch_size_without_glasses, 6)) * self.pertFG).to(self.device)
-        glasses_transformed, _, _ = self.model_G(FG_images, BG_images, pPertFG)
+        glasses_transformed, _, _, color_params = self.model_G(FG_images, BG_images, pPertFG)
         glasses_transformed = glasses_transformed.to(self.device)
-        fake_images = concatenate_glasses_and_foreground(glasses_transformed, BG_images)
+        fake_images = concatenate_glasses_and_foreground(glasses_transformed, BG_images, color_params)
 
         out_src = self.model_D(fake_images.detach()).to(self.device)
         d_loss_fake = torch.mean(out_src)
