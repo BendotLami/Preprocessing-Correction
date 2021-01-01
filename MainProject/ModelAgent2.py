@@ -22,7 +22,8 @@ class ModelAgentColorCorrection(object):
         self.dataset = dataset
 
         transforms = torch.nn.Sequential(
-            torchvision.transforms.ColorJitter(brightness=0.5, contrast=0.5),
+            # torchvision.transforms.ColorJitter(brightness=0.5, contrast=0.5),
+            torchvision.transforms.RandomRotation(degrees=20, fill=0, resample=0)
         )
         self.scripted_transforms = torch.jit.script(transforms)
 
@@ -41,9 +42,11 @@ class ModelAgentColorCorrection(object):
                 batch_data = batch_data.to(self.device)
                 data_augmented = self.scripted_transforms(batch_data).to(self.device)
 
-                img_reconstructed = self.model(data_augmented).to(self.device)
+                img_reconstructed, affine_params = self.model(data_augmented).to(self.device)
 
-                train_loss = criterion(img_reconstructed, batch_data)
+                dp_sqnorm = torch.sum(affine_params**2+1e-8, dim=1)
+                loss_GP_dpnorm = torch.mean(dp_sqnorm)
+                train_loss = criterion(img_reconstructed, batch_data) + loss_GP_dpnorm
 
                 self.optimizer.zero_grad()
                 train_loss.backward()
