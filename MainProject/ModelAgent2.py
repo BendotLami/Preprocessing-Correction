@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 
 from preprocess_model import *
 
-BATCH_SIZE = 16
+BATCH_SIZE = 64
 
 class ModelAgentColorCorrection(object):
     def __init__(self, dataset):
@@ -77,10 +77,12 @@ class ModelAgentColorCorrection(object):
 
                         valid_reconstruct_img = np.clip(img_reconstruct, 0, 1)
 
-                        plt.imsave(str("./test_output_color/output_" + str(save_idx) + ".jpg"),
+                        plt.imsave(str("./test_output_color/" + str(epoch) + "_" + str(save_idx) + ".jpg"),
                                    np.concatenate((img.transpose(1, 2, 0), img_color_augmented.transpose(1, 2, 0),
                                                    valid_reconstruct_img.transpose(1, 2, 0)), axis=1))
 
                         save_idx += 1
+
+            torch.save(self.model.state_dict(), str("./Model_Weights/" + "weights" + "_" + str(epoch)))
 
             print("Done epoch", epoch, "!")
