@@ -22,7 +22,7 @@ class ModelAgentColorCorrection(object):
         self.dataset = dataset
 
         transforms = torch.nn.Sequential(
-            torchvision.transforms.ColorJitter(brightness=0.5, contrast=0.5),
+            torchvision.transforms.ColorJitter(brightness=0.7, contrast=0.7),
         )
         self.scripted_transforms = torch.jit.script(transforms)
 
@@ -34,7 +34,7 @@ class ModelAgentColorCorrection(object):
         train_data_loader = torch.utils.data.DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
         test_data_loader = torch.utils.data.DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=True)
 
-        criterion = nn.MSELoss()
+        criterion = nn.L1Loss()
 
         for epoch in range(100):
             for batch_data in train_data_loader:

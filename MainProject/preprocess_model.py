@@ -11,24 +11,24 @@ class ColorCorrectionNet(nn.Module):
         # geometric transform:
         self.conv1 = nn.Sequential(nn.Conv2d(in_layers, in_layers, 4, 2, 1), nn.LeakyReLU(True))
         # in_layers += 3
-        self.conv2 = nn.Sequential(nn.Conv2d(in_layers, in_layers, 4, 2, 1), nn.LeakyReLU(True))
+        # self.conv2 = nn.Sequential(nn.Conv2d(in_layers, in_layers, 4, 2, 1), nn.LeakyReLU(True))
         # in_layers += 3
-        self.conv3 = nn.Sequential(nn.Conv2d(in_layers, in_layers, 4, 2, 1), nn.LeakyReLU(True))
+        # self.conv3 = nn.Sequential(nn.Conv2d(in_layers, in_layers, 4, 2, 1), nn.LeakyReLU(True))
         # in_layers += 3
         # self.conv4 = nn.Sequential(nn.Conv2d(in_layers, in_layers, 5, 1, 2), nn.ReLU(True))
         # in_layers += 3
         # self.conv5 = nn.Sequential(nn.Conv2d(in_layers, in_layers, 4, 2, 2), nn.ReLU(True))
         # in_layers += 3
 
-        self.linear_layer_1 = nn.Sequential(nn.Linear(in_layers*18*18, 256), nn.ReLU(True))
+        self.linear_layer_1 = nn.Sequential(nn.Linear(in_layers * 72 * 72, 256), nn.ReLU(True))
         self.linear_layer_2 = nn.Sequential(nn.Linear(256, 6))
 
 
     def forward(self, image):
         feat = image
         feat = self.conv1(feat)
-        feat = self.conv2(feat)
-        feat = self.conv3(feat)
+        # feat = self.conv2(feat)
+        # feat = self.conv3(feat)
         # feat = self.conv4(feat)
         feat = feat.view(feat.size()[0], -1)
         feat = self.linear_layer_1(feat)
