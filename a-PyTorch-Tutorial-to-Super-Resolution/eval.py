@@ -1,12 +1,14 @@
 from utils import *
-from skimage.metrics import peak_signal_noise_ratio, structural_similarity
+# from skimage.metrics import peak_signal_noise_ratio, structural_similarity
 from datasets import SRDataset
+import numpy as np
+import matplotlib.pyplot as plt
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Data
 data_folder = "./"
-test_data_names = ["Set5", "Set14", "BSDS100"]
+test_data_names = ["Set5"]
 
 # Model checkpoints
 srgan_checkpoint = "./checkpoint_srgan.pth.tar"
@@ -16,9 +18,25 @@ srresnet_checkpoint = "./checkpoint_srresnet.pth.tar"
 # srresnet = torch.load(srresnet_checkpoint)['model'].to(device)
 # srresnet.eval()
 # model = srresnet
-srgan_generator = torch.load(srgan_checkpoint)['generator'].to(device)
+srgan_generator = torch.load(srresnet_checkpoint)['model'].to(device)
 srgan_generator.eval()
 model = srgan_generator
+
+image_counter = 0
+
+
+def save_images(images):
+    images = images.cpu()
+    # images =
+    global image_counter
+    for i in range(images.shape[0]):
+        real = images[i].numpy().transpose(1, 2, 0)
+        real = (real + 1.) / 2.
+        real = np.clip(real, 0, 1)
+        plt.imsave(str("./srresnet_outputs/" + "output_" + str(i) + "_batch_" + str(image_counter) + ".jpg"), real)
+    image_counter += 1
+    print("Done printing!")
+
 
 # Evaluate
 for test_data_name in test_data_names:
@@ -54,15 +72,17 @@ for test_data_name in test_data_names:
             sr_imgs_y = convert_image(sr_imgs, source='[-1, 1]', target='y-channel').squeeze(
                 0)  # (w, h), in y-channel
             hr_imgs_y = convert_image(hr_imgs, source='[-1, 1]', target='y-channel').squeeze(0)  # (w, h), in y-channel
-            psnr = peak_signal_noise_ratio(hr_imgs_y.cpu().numpy(), sr_imgs_y.cpu().numpy(),
-                                           data_range=255.)
-            ssim = structural_similarity(hr_imgs_y.cpu().numpy(), sr_imgs_y.cpu().numpy(),
-                                         data_range=255.)
-            PSNRs.update(psnr, lr_imgs.size(0))
-            SSIMs.update(ssim, lr_imgs.size(0))
+            # psnr = peak_signal_noise_ratio(hr_imgs_y.cpu().numpy(), sr_imgs_y.cpu().numpy(),
+            #                                data_range=255.)
+            # ssim = structural_similarity(hr_imgs_y.cpu().numpy(), sr_imgs_y.cpu().numpy(),
+            #                              data_range=255.)
+            # PSNRs.update(psnr, lr_imgs.size(0))
+            # SSIMs.update(ssim, lr_imgs.size(0))
+
+            save_images(sr_imgs)
 
     # Print average PSNR and SSIM
-    print('PSNR - {psnrs.avg:.3f}'.format(psnrs=PSNRs))
-    print('SSIM - {ssims.avg:.3f}'.format(ssims=SSIMs))
+    # print('PSNR - {psnrs.avg:.3f}'.format(psnrs=PSNRs))
+    # print('SSIM - {ssims.avg:.3f}'.format(ssims=SSIMs))
 
 print("\n")

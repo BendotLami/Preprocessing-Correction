@@ -3,8 +3,12 @@ from torch.utils.data import Dataset
 import json
 import os
 from PIL import Image
-from utils import ImageTransforms
+from utils import ImageTransforms, get_img_lists
+import numpy as np
+import natsort
 
+CELEB_A_DIR = "/home/dcor/datasets/CelebAMask-HQ/CelebA-HQ-img/"
+GLASSES_NPY_DIR = "/home/dcor/ronmokady/workshop21/team4/glasses.npy"
 
 class SRDataset(Dataset):
     """
@@ -41,13 +45,19 @@ class SRDataset(Dataset):
         if self.split == 'train':
             assert self.crop_size % self.scaling_factor == 0, "Crop dimensions are not perfectly divisible by scaling factor! This will lead to a mismatch in the dimensions of the original HR patches and their super-resolved (SR) versions!"
 
+        glasses_on, glasses_off = get_img_lists('/home/dcor/datasets/CelebAMask-HQ/CelebAMask-HQ-attribute-anno.txt')
+        img_list = np.concatenate((glasses_on, glasses_off))
+
         # Read list of image-paths
+        self.main_dir = CELEB_A_DIR
+        # img_list = img_list[:1000]  # TODO: temporary
+        all_jpg = [i for i in img_list if i.endswith('.jpg')]
+        self.total_imgs = natsort.natsorted(all_jpg)
+
         if self.split == 'train':
-            with open(os.path.join(data_folder, 'train_images.json'), 'r') as j:
-                self.images = json.load(j)
+            self.images = self.total_imgs[:25000]
         else:
-            with open(os.path.join(data_folder, self.test_data_name + '_test_images.json'), 'r') as j:
-                self.images = json.load(j)
+            self.images = self.total_imgs[25000:]
 
         # Select the correct set of transforms
         self.transform = ImageTransforms(split=self.split,
@@ -64,7 +74,7 @@ class SRDataset(Dataset):
         :return: the 'i'th pair LR and HR images to be fed into the model
         """
         # Read image
-        img = Image.open(self.images[i], mode='r')
+        img = Image.open(str(CELEB_A_DIR + self.images[i]), mode='r')
         img = img.convert('RGB')
         if img.width <= 96 or img.height <= 96:
             print(self.images[i], img.width, img.height)

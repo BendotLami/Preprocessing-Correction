@@ -220,3 +220,21 @@ def adjust_learning_rate(optimizer, shrink_factor):
     for param_group in optimizer.param_groups:
         param_group['lr'] = param_group['lr'] * shrink_factor
     print("The new learning rate is %f\n" % (optimizer.param_groups[0]['lr'],))
+
+
+def get_img_lists(file_path):
+    glasses_on = []
+    glasses_off = []
+    skip_count = 2
+    with open(file_path, "r") as f:
+        for line in f:
+            if skip_count > 0:  # skip first 2 lines
+                skip_count -= 1
+                continue
+            attr_list = line.split(' ')
+            if int(attr_list[17]) == 1:
+                glasses_on.append(attr_list[0])
+            else:
+                glasses_off.append(attr_list[0])
+
+    return glasses_on, glasses_off
