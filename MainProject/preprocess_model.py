@@ -60,9 +60,63 @@ class ColorCorrectionNet(nn.Module):
         feat_rotation = self.rotation_dropout_2(feat_rotation)
         feat_rotation = self.rotation_linear_layer_2(feat_rotation)
 
-        # theta = feat_rotation.view(-1, 2, 3)
-        #
-        # grid = F.affine_grid(theta, image)
-        # image_rotated = F.grid_sample(image, grid)
+        theta = feat_rotation.view(-1, 2, 3)
+
+        grid = F.affine_grid(theta, image)
+        image_rotated = F.grid_sample(image, grid)
 
         return feat_rotation
+
+
+class RotationGenerator(nn.Module):
+    def __init__(self):
+        super(RotationGenerator, self).__init__()
+        in_layers = 3
+        self.conv1 = nn.Sequential(nn.Conv2d(in_layers, in_layers, 4, 2, 1), nn.ReLU(True))
+        self.conv2 = nn.Sequential(nn.Conv2d(in_layers, in_layers, 4, 2, 1), nn.ReLU(True))
+
+        self.linear1 = nn.Sequential(nn.Linear(in_layers*36*36, 256), nn.ReLU(True))
+        self.linear2 = nn.Sequential(nn.Linear(256, 6))
+
+        self.linear2[0].weight.data.zero_()
+        self.linear2[0].bias.data.copy_(torch.tensor([1, 0, 0, 0, 1, 0], dtype=torch.float))
+
+    def forward(self, image):
+        feat = image
+        feat = self.conv1(feat)
+        feat = self.conv2(feat)
+        feat = feat.view(feat.size()[0], -1)
+        feat = self.linear1(feat)
+        feat = self.linear2(feat)
+
+        theta = feat.view(-1, 2, 3)
+
+        print("image:", image.shape)
+        print("matirx:", theta.shape)
+
+        grid = F.affine_grid(theta, image.size())
+        image_rotated = F.grid_sample(image, grid)
+
+        return image_rotated, feat
+
+
+class RotationDiscriminator(nn.Module):
+    def __init__(self):
+        super(RotationDiscriminator, self).__init__()
+        in_layers = 3
+        self.conv1 = nn.Sequential(nn.Conv2d(in_layers, in_layers, 4, 2, 1), nn.ReLU(True))
+        self.conv2 = nn.Sequential(nn.Conv2d(in_layers, in_layers, 4, 2, 1), nn.ReLU(True))
+
+        self.linear1 = nn.Sequential(nn.Linear(in_layers*36*36, 256), nn.ReLU(True))
+        self.linear2 = nn.Sequential(nn.Linear(256, 1), nn.Sigmoid())
+
+    def forward(self, image):
+        feat = image
+        feat = self.conv1(feat)
+        feat = self.conv2(feat)
+        feat = feat.view(feat.size()[0], -1)
+        feat = self.linear1(feat)
+        feat = self.linear2(feat)
+
+        return feat
+

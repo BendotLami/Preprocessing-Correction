@@ -102,9 +102,12 @@ class ModelAgentColorCorrection(object):
     def __init__(self, dataset):
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-        self.model = ColorCorrectionNet().to(self.device)
-        self.optimizer = optim.Adam(self.model.parameters(), lr=0.01)
-        self.lr_scheduler = optim.lr_scheduler.StepLR(self.optimizer, step_size=800000, gamma=0.1)
+        # self.model = ColorCorrectionNet().to(self.device)
+        self.generator = RotationGenerator().to(self.device)
+        self.discriminator = RotationDiscriminator().to(self.device)
+        self.generator_optimizer = optim.Adam(self.generator.parameters(), lr=0.001)
+        self.discriminator_optimizer = optim.Adam(self.discriminator.parameters(), lr=0.001)
+        # self.lr_scheduler = optim.lr_scheduler.StepLR(self.optimizer, step_size=800000, gamma=0.1)
 
         self.dataset = dataset
 
@@ -114,6 +117,9 @@ class ModelAgentColorCorrection(object):
         )
         self.scripted_transforms = torch.jit.script(transforms)
 
+        self.generator_classification_lambda = 1
+        self.generator_geometric_lambda = 1
+
     def train(self):
         train_size = int(0.9 * len(self.dataset))
         test_size = len(self.dataset) - train_size
@@ -122,64 +128,76 @@ class ModelAgentColorCorrection(object):
         train_data_loader = torch.utils.data.DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
         test_data_loader = torch.utils.data.DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=True)
 
-        criterion = nn.MSELoss()
+        criterion = nn.BCELoss()
 
         for epoch in range(100):
             for batch_data in train_data_loader:
                 batch_data = batch_data.to(self.device)
-                angles = ((torch.rand(batch_data.shape[0], 1) - 0.5) * 90).to(self.device)
-                for i in range(batch_data.shape[0]):
-                    batch_data[i] = torchvision.transforms.functional.rotate(batch_data[i], float(angles[i][0])).to(self.device)
+                batch_data_classification = torch.ones([batch_data.shape[0], 1]).to(self.device)
+                self.generator_optimizer.zero_grad()
 
-                feat = self.model(batch_data).to(self.device)
+                # generator training
+                fake_input_batch = self.scripted_transforms(batch_data).to(self.device)
+                fake_input_classification = torch.ones([batch_data.shape[0], 1]).to(self.device)
+                fake_output_batch, matrix = self.generator(fake_input_batch)
+                fake_output_batch = fake_output_batch.to(self.device)
+                matrix = matrix.to(self.device)
 
-                # dp_sqnorm = torch.sum(affine_params**2+1e-8, dim=1)
-                # loss_GP_dpnorm = torch.mean(dp_sqnorm)
-                # train_loss = criterion(img_reconstructed, batch_data) + loss_GP_dpnorm
+                fake_output_rating = self.discriminator(fake_output_batch).to(self.device)
+                classification_loss_generator = criterion(fake_output_rating, fake_input_classification)
+                geometric_loss = torch.sum(matrix**2)
 
-                train_loss = torch.autograd.Variable(angle_error(angles, feat), requires_grad=True)
+                generator_loss = self.generator_classification_lambda * classification_loss_generator \
+                                 + self.generator_geometric_lambda * geometric_loss
+                generator_loss.backward()
+                self.generator_optimizer.step()
 
-                self.optimizer.zero_grad()
-                train_loss.backward()
-                self.optimizer.step()
-                self.lr_scheduler.step()
+                # discriminator
+                self.discriminator_optimizer.zero_grad()
+                true_discriminator_out = self.discriminator(batch_data).to(self.device)
+                true_discriminator_loss = criterion(true_discriminator_out, batch_data_classification)
 
-                print("Done batch!")
+                generator_discriminator_out = self.discriminator(fake_output_batch.detach()).to(self.device)
+                generator_discriminator_loss = criterion(generator_discriminator_out, torch.zeros([batch_data.shape[0], 1]).to(self.device))
+
+                discriminator_loss = (true_discriminator_loss + generator_discriminator_loss) / 2
+                discriminator_loss.backward()
+                self.discriminator_optimizer.step()
+
+            print("Done batch!")
 
             with torch.no_grad():
                 save_idx = 0
                 for batch_data_test in test_data_loader:
-                    original_input = torch.clone(batch_data_test)
                     batch_data_test = batch_data_test.to(self.device)
-                    angles = ((torch.rand(batch_data_test.shape[0], 1) - 0.5) * 90).to(self.device)
-                    for i in range(batch_data_test.shape[0]):
-                        batch_data_test[i] = torchvision.transforms.functional.rotate(batch_data_test[i], float(angles[i][0])).to(self.device)
+                    data_augmented = self.scripted_transforms(batch_data_test).to(self.device)
 
-                    original_input_rotated = torch.clone(batch_data_test)
-
-                    feat = self.model(batch_data_test).to(self.device)
-
-                    # img_reconstructed = torch.empty()
-                    for i in range(batch_data_test.shape[0]):
-                        batch_data_test[i] = torchvision.transforms.functional.rotate(batch_data_test[i], -1 * float(torch.argmax(feat[i]))).to(self.device)
+                    img_reconstructed = self.generator(data_augmented).to(self.device)
 
                     # print(criterion(img_reconstructed, batch_data_test).data)
 
                     test_examples_cpu = batch_data_test.cpu()
 
-                    # reconstruction_cpu = img_reconstructed.cpu()
+                    reconstruction_cpu = img_reconstructed.cpu()
 
-                    for index in range(int(len(test_examples_cpu)/10)):
+                    data_augmented = data_augmented.cpu()
+
+                    for index in range(int(len(img_reconstructed)/10)):
                         img = test_examples_cpu[index].numpy()
-                        orig_input = original_input[index].numpy()
-                        orig_in_rotated = original_input_rotated[index].cpu().numpy()
 
-                        plt.imsave(str("./test_output_rotation/" + str(epoch) + "_" + str(save_idx) + ".jpg"),
-                                   np.concatenate((img.transpose(1, 2, 0), orig_input.transpose(1, 2, 0),
-                                                   orig_in_rotated.transpose(1, 2, 0)), axis=1))
+                        img_reconstruct = reconstruction_cpu[index].numpy()
+
+                        img_color_augmented = data_augmented[index].numpy()
+
+                        valid_reconstruct_img = np.clip(img_reconstruct, 0, 1)
+
+                        plt.imsave(str("./test_output_color/" + str(epoch) + "_" + str(save_idx) + ".jpg"),
+                                   np.concatenate((img.transpose(1, 2, 0), img_color_augmented.transpose(1, 2, 0),
+                                                   valid_reconstruct_img.transpose(1, 2, 0)), axis=1))
 
                         save_idx += 1
 
-            torch.save(self.model.state_dict(), str("./Model_Weights/" + "weights" + "_" + str(epoch)))
+            torch.save(self.discriminator.state_dict(), str("./Model_Weights/" + "disc_weights" + "_" + str(epoch)))
+            torch.save(self.generator.state_dict(), str("./Model_Weights/" + "gen_weights" + "_" + str(epoch)))
 
             print("Done epoch", epoch, "!")
