@@ -22,7 +22,7 @@ class ModelAgentColorCorrection(object):
         self.dataset = dataset
 
         transforms = torch.nn.Sequential(
-            torchvision.transforms.ColorJitter(brightness=0.3, contrast=0.3),
+            torchvision.transforms.ColorJitter(brightness=0.5, contrast=0.5),
         )
         self.scripted_transforms = torch.jit.script(transforms)
 
