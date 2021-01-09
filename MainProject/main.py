@@ -27,7 +27,7 @@ class CustomDataSet(Dataset):
     def __init__(self, main_dir, transform, img_list):
         self.main_dir = main_dir
         self.transform = transform
-        img_list = img_list[:1000]  # TODO: temporary
+        img_list = img_list[:3000]  # TODO: temporary
         all_jpg = [i for i in img_list if i.endswith('.jpg')]
         self.total_imgs = natsort.natsorted(all_jpg)
 

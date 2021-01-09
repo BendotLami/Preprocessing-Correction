@@ -9,7 +9,7 @@ class ColorCorrectionNet(nn.Module):
         in_layers = 3
 
         # geometric transform:
-        self.conv1 = nn.Sequential(nn.Conv2d(in_layers, in_layers, 4, 2, 1), nn.LeakyReLU(True))
+        self.conv1 = nn.Sequential(nn.Conv2d(in_layers, in_layers, 4, 2, 1), nn.ReLU(True))
         # in_layers += 3
         # self.conv2 = nn.Sequential(nn.Conv2d(in_layers, in_layers, 4, 2, 1), nn.LeakyReLU(True))
         # in_layers += 3
@@ -22,7 +22,6 @@ class ColorCorrectionNet(nn.Module):
 
         self.linear_layer_1 = nn.Sequential(nn.Linear(in_layers * 72 * 72, 256), nn.ReLU(True))
         self.linear_layer_2 = nn.Sequential(nn.Linear(256, 6))
-
 
     def forward(self, image):
         feat = image
