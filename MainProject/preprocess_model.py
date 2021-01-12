@@ -81,18 +81,19 @@ class RotationGenerator(nn.Module):
         self.linear2[0].weight.data.zero_()
         self.linear2[0].bias.data.copy_(torch.tensor([1, 0, 0, 0, 1, 0], dtype=torch.float))
 
-    def forward(self, image):
-        feat = image
+    def forward(self, image, start_feat):
+        theta = start_feat.view(-1, 2, 3)
+        grid = F.affine_grid(theta, image.size())
+        feat = F.grid_sample(image, grid)
         feat = self.conv1(feat)
         feat = self.conv2(feat)
         feat = feat.view(feat.size()[0], -1)
         feat = self.linear1(feat)
         feat = self.linear2(feat)
 
-        theta = feat.view(-1, 2, 3)
+        feat = feat.view(-1, 2, 3)
 
-        print("image:", image.shape)
-        print("matirx:", theta.shape)
+        theta = theta + feat
 
         grid = F.affine_grid(theta, image.size())
         image_rotated = F.grid_sample(image, grid)

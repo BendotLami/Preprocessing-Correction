@@ -112,13 +112,14 @@ class ModelAgentColorCorrection(object):
         self.dataset = dataset
 
         transforms = torch.nn.Sequential(
-            # torchvision.transforms.ColorJitter(brightness=0.5, contrast=0.5),
             torchvision.transforms.RandomRotation(degrees=20, fill=0, resample=0)
         )
         self.scripted_transforms = torch.jit.script(transforms)
 
-        self.generator_classification_lambda = 1
+        self.generator_classification_lambda = 0.01
         self.generator_geometric_lambda = 1
+
+        self.start_rotation_sigma = 0.1
 
     def train(self):
         train_size = int(0.9 * len(self.dataset))
@@ -139,13 +140,17 @@ class ModelAgentColorCorrection(object):
                 # generator training
                 fake_input_batch = self.scripted_transforms(batch_data).to(self.device)
                 fake_input_classification = torch.ones([batch_data.shape[0], 1]).to(self.device)
-                fake_output_batch, matrix = self.generator(fake_input_batch)
+                generator_start_rotation = torch.normal(torch.zeros((batch_data.shape[0], 6)), torch.ones((batch_data.shape[0], 6)) * self.start_rotation_sigma).to(self.device)
+                fake_output_batch, matrix = self.generator(fake_input_batch, generator_start_rotation)
                 fake_output_batch = fake_output_batch.to(self.device)
                 matrix = matrix.to(self.device)
 
                 fake_output_rating = self.discriminator(fake_output_batch).to(self.device)
                 classification_loss_generator = criterion(fake_output_rating, fake_input_classification)
                 geometric_loss = torch.sum(matrix**2)
+
+                print("gene-class: ", classification_loss_generator.data)
+                print("gene-geo: ", geometric_loss.data)
 
                 generator_loss = self.generator_classification_lambda * classification_loss_generator \
                                  + self.generator_geometric_lambda * geometric_loss
@@ -160,19 +165,24 @@ class ModelAgentColorCorrection(object):
                 generator_discriminator_out = self.discriminator(fake_output_batch.detach()).to(self.device)
                 generator_discriminator_loss = criterion(generator_discriminator_out, torch.zeros([batch_data.shape[0], 1]).to(self.device))
 
+                print("disc-true: ", true_discriminator_loss.data)
+                print("disc-fake: ", generator_discriminator_loss.data)
+
                 discriminator_loss = (true_discriminator_loss + generator_discriminator_loss) / 2
                 discriminator_loss.backward()
                 self.discriminator_optimizer.step()
 
-            print("Done batch!")
+                print("Done batch!")
 
             with torch.no_grad():
                 save_idx = 0
                 for batch_data_test in test_data_loader:
                     batch_data_test = batch_data_test.to(self.device)
                     data_augmented = self.scripted_transforms(batch_data_test).to(self.device)
+                    generator_start_rotation = torch.normal(torch.zeros((batch_data_test.shape[0], 6)), torch.ones((batch_data_test.shape[0], 6)) * self.start_rotation_sigma).to(self.device)
 
-                    img_reconstructed = self.generator(data_augmented).to(self.device)
+                    img_reconstructed, _ = self.generator(data_augmented, generator_start_rotation)
+                    img_reconstructed = img_reconstructed.to(self.device)
 
                     # print(criterion(img_reconstructed, batch_data_test).data)
 
@@ -191,7 +201,7 @@ class ModelAgentColorCorrection(object):
 
                         valid_reconstruct_img = np.clip(img_reconstruct, 0, 1)
 
-                        plt.imsave(str("./test_output_color/" + str(epoch) + "_" + str(save_idx) + ".jpg"),
+                        plt.imsave(str("./test_output_rotation/" + str(epoch) + "_" + str(save_idx) + ".jpg"),
                                    np.concatenate((img.transpose(1, 2, 0), img_color_augmented.transpose(1, 2, 0),
                                                    valid_reconstruct_img.transpose(1, 2, 0)), axis=1))
 
