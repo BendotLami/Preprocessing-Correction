@@ -18,24 +18,33 @@ srresnet_checkpoint = "./checkpoint_srresnet.pth.tar"
 # srresnet = torch.load(srresnet_checkpoint)['model'].to(device)
 # srresnet.eval()
 # model = srresnet
-srgan_generator = torch.load(srresnet_checkpoint)['model'].to(device)
+srgan_generator = torch.load(srgan_checkpoint)['generator'].to(device)
 srgan_generator.eval()
 model = srgan_generator
 
 image_counter = 0
 
 
-def save_images(images):
+def save_images(images, lr_images):
     images = images.cpu()
+    lr_images = lr_images.cpu()
     # images =
     global image_counter
     for i in range(images.shape[0]):
         real = images[i].numpy().transpose(1, 2, 0)
+        print(real.dtype, np.max(real), np.min(real))
         real = (real + 1.) / 2.
         real = np.clip(real, 0, 1)
-        plt.imsave(str("./srresnet_outputs/" + "output_" + str(i) + "_batch_" + str(image_counter) + ".jpg"), real)
+
+        lr_real = lr_images[i].numpy().transpose(1, 2, 0)
+        print(lr_real.dtype, np.max(lr_real), np.min(lr_real))
+        lr_real = (lr_real + 2.) / 4.
+        lr_real = np.clip(lr_real, 0, 1)
+
+        plt.imsave(str("./srgan_outputs/" + "output_" + str(i) + "_batch_" + str(image_counter) + ".jpg"), real)
+        plt.imsave(str("./srgan_outputs/" + "output_" + str(i) + "_batch_" + str(image_counter) + "_lr.jpg"), lr_real)
     image_counter += 1
-    print("Done printing!")
+    print("Done printing! count:", image_counter)
 
 
 # Evaluate
@@ -79,7 +88,7 @@ for test_data_name in test_data_names:
             # PSNRs.update(psnr, lr_imgs.size(0))
             # SSIMs.update(ssim, lr_imgs.size(0))
 
-            save_images(sr_imgs)
+            save_images(sr_imgs, lr_imgs)
 
     # Print average PSNR and SSIM
     # print('PSNR - {psnrs.avg:.3f}'.format(psnrs=PSNRs))
