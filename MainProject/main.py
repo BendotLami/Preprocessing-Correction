@@ -96,13 +96,13 @@ def fix_glasses(glasses):
 if __name__ == "__main__":
     # plt.ion()   # interactive mode
     TRANSFORM_IMG = torchvision.transforms.Compose([
-        torchvision.transforms.Resize(144),
-        torchvision.transforms.CenterCrop(144),
+        torchvision.transforms.Resize(256),
+        torchvision.transforms.CenterCrop(256),
         torchvision.transforms.ToTensor()
     ])
     TRANSFORM_IMG_COLOR = torchvision.transforms.Compose([
-        torchvision.transforms.Resize(144),
-        torchvision.transforms.CenterCrop(144),
+        torchvision.transforms.Resize(256),
+        torchvision.transforms.CenterCrop(256),
         torchvision.transforms.ColorJitter(brightness=0.5, contrast=0.5),
         torchvision.transforms.ToTensor()
     ])
@@ -119,7 +119,7 @@ if __name__ == "__main__":
     # glasses = np.load(GLASSES_NPY_DIR)  # x-y-z
     # glasses = fix_glasses(glasses)
 
-    agent = ModelAgentColorCorrection(dataset_original)
+    agent = ModelAgentRotationCorrection(dataset_original)
 
     agent.train()
 
