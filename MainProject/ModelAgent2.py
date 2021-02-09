@@ -10,7 +10,7 @@ import cv2
 
 from preprocess_model import *
 
-BATCH_SIZE = 64
+BATCH_SIZE = 16
 
 def rotate(image, angle):
     """
@@ -105,7 +105,7 @@ class ModelAgentColorCorrection(object):
         # self.model = ColorCorrectionNet().to(self.device)
         self.generator = RotationGenerator().to(self.device)
         self.discriminator = RotationDiscriminator().to(self.device)
-        self.generator_optimizer = optim.Adam(self.generator.parameters(), lr=0.001)
+        self.generator_optimizer = optim.Adam(self.generator.parameters(), lr=0.0001)
         self.discriminator_optimizer = optim.Adam(self.discriminator.parameters(), lr=0.001)
         # self.lr_scheduler = optim.lr_scheduler.StepLR(self.optimizer, step_size=800000, gamma=0.1)
 
@@ -119,7 +119,7 @@ class ModelAgentColorCorrection(object):
         self.generator_classification_lambda = 0.01
         self.generator_geometric_lambda = 1
 
-        self.start_rotation_sigma = 0.1
+        self.start_rotation_sigma = 0.05
 
     def train(self):
         train_size = int(0.9 * len(self.dataset))
