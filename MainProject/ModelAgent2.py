@@ -94,8 +94,15 @@ def angle_error(y_true, y_pred):
     and the predicted angles. Each angle is represented
     as a binary vector.
     """
-    diff = angle_difference(torch.argmax(y_true), torch.argmax(y_pred))
+    diff = angle_difference(y_true, torch.argmax(y_pred))
     return torch.mean(torch.abs(diff).float())
+
+
+def get_random_angles_array(batch_size):
+    angles = ((torch.rand(batch_size) - 0.5) * 90)
+    angles = angles.long() % 360
+
+    return angles
 
 
 class ModelAgentRotationCorrection(object):
@@ -103,7 +110,7 @@ class ModelAgentRotationCorrection(object):
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
         self.model = RotationCorrectionNet().to(self.device)
-        self.model_optimizer = optim.Adam(self.model.parameters(), lr=0.01)
+        self.model_optimizer = optim.SGD(self.model.parameters(), lr=0.01)
         self.lr_scheduler = optim.lr_scheduler.StepLR(self.model_optimizer, step_size=800000, gamma=0.1)
 
         self.dataset = dataset
@@ -117,37 +124,45 @@ class ModelAgentRotationCorrection(object):
         train_data_loader = torch.utils.data.DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
         test_data_loader = torch.utils.data.DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=True)
 
-        criterion = nn.BCELoss()
+        criterion = nn.NLLLoss()
 
         for epoch in range(100):
+            ## train
             for batch_data in train_data_loader:
                 batch_data = batch_data.to(self.device)
-                angles = ((torch.rand(batch_data.shape[0], 1) - 0.5) * 90).to(self.device)
+                angles = get_random_angles_array(batch_data.shape[0]).to(self.device)
                 for i in range(batch_data.shape[0]):
-                    batch_data[i] = torchvision.transforms.functional.rotate(batch_data[i], float(angles[i][0])).to(self.device)
+                    batch_data[i] = torchvision.transforms.functional.rotate(batch_data[i], float(angles[i])).to(self.device)
 
                 feat = self.model(batch_data).to(self.device)
 
-                train_loss = torch.autograd.Variable(angle_error(angles, feat), requires_grad=True)
+                # train_loss = torch.autograd.Variable(angle_error(angles, feat), requires_grad=True)
+                # print(feat.dtype, angles_probability.dtype)
+                train_loss = criterion(feat, angles)
 
                 self.model_optimizer.zero_grad()
+                print("angle error: ", angle_error(angles, feat))
                 train_loss.backward()
                 self.model_optimizer.step()
 
                 print("Done batch!")
 
+
+            ## test
             with torch.no_grad():
                 save_idx = 0
                 for batch_data_test in test_data_loader:
                     original_input = torch.clone(batch_data_test)
                     batch_data_test = batch_data_test.to(self.device)
-                    angles = ((torch.rand(batch_data_test.shape[0], 1) - 0.5) * 90).to(self.device)
+                    angles = get_random_angles_array(batch_data_test.shape[0]).to(self.device)
                     for i in range(batch_data_test.shape[0]):
-                        batch_data_test[i] = torchvision.transforms.functional.rotate(batch_data_test[i], float(angles[i][0])).to(self.device)
+                        batch_data_test[i] = torchvision.transforms.functional.rotate(batch_data_test[i], float(angles[i])).to(self.device)
 
                     original_input_rotated = torch.clone(batch_data_test)
 
                     feat = self.model(batch_data_test).to(self.device)
+
+                    print("test loss: ", criterion(feat, angles).data)
 
                     for i in range(batch_data_test.shape[0]):
                         batch_data_test[i] = torchvision.transforms.functional.rotate(batch_data_test[i], -1 * float(torch.argmax(feat[i]))).to(self.device)
