@@ -12,9 +12,13 @@ import natsort
 import os
 from PIL import Image
 import json
+import cv2
 
 # from preprocess_model import *
 from ColorCorrectionAgent import *
+from GlassesAgent import *
+
+IMAGE_SIZE = 256
 
 CELEB_A_DIR = "/home/dcor/datasets/CelebAMask-HQ/CelebA-HQ-img/"
 GLASSES_NPY_DIR = "/home/dcor/ronmokady/workshop21/team4/glasses.npy"
@@ -40,8 +44,8 @@ BATCH_SIZE_WITHOUT_GLASSES = 16
 class CustomDataSet(Dataset):
     def __init__(self, main_dir, img_list):
         TRANSFORM_IMG = torchvision.transforms.Compose([
-            torchvision.transforms.Resize(256),
-            torchvision.transforms.CenterCrop(256),
+            torchvision.transforms.Resize(IMAGE_SIZE),
+            torchvision.transforms.CenterCrop(IMAGE_SIZE),
             torchvision.transforms.ToTensor()
         ])
 
@@ -81,15 +85,22 @@ def get_img_lists(file_path):
 
 
 def fix_glasses(glasses):
-    glasses = glasses.transpose(0, 3, 1, 2)  # z-x-y
-    glasses = glasses / 255
-    glasses_alpha = glasses[:, 3, :, :]
-    to_delete = np.where(glasses_alpha == 0)
-    glasses[to_delete[0], :, to_delete[1], to_delete[2]] = 0
-    # glasses = glasses[:, :3, :, :]
-    glasses = glasses.astype(np.float32)
+    # image scaling
+    rtn_img = np.zeros((glasses.shape[0], IMAGE_SIZE, IMAGE_SIZE, glasses.shape[3]))
+    for i in range(glasses.shape[0]):
+        rtn_img[i] = cv2.resize(glasses[i], dsize=(IMAGE_SIZE, IMAGE_SIZE), interpolation=cv2.INTER_CUBIC)
+    # PIL compatibility
+    rtn_img = rtn_img.transpose(0, 3, 1, 2)  # z-x-y
+    # to float [0,1]
+    rtn_img = rtn_img / 255
+    # remove background according to alpha
+    rtn_img_alpha = rtn_img[:, 3, :, :]
+    to_delete = np.where(rtn_img_alpha == 0)
+    rtn_img[to_delete[0], :, to_delete[1], to_delete[2]] = 0
+    # rtn_img = rtn_img[:, :3, :, :]
+    rtn_img = rtn_img.astype(np.float32)
 
-    return glasses
+    return rtn_img
 
 
 if __name__ == "__main__":
@@ -105,6 +116,17 @@ if __name__ == "__main__":
     dataset_all = CustomDataSet(CELEB_A_DIR, all_images)
 
     # Color correction model
-    agent_color_correction = ModelAgentColorCorrection(dataset_all, config_dict['color-correction'])
-    agent_color_correction.train()
+    # agent_color_correction = ModelAgentColorCorrection(dataset_all, config_dict['color-correction'])
+    # agent_color_correction.train()
+
+    # Glasses model
+    dataset_with_glasses = CustomDataSet(CELEB_A_DIR, glasses_on)
+    dataset_without_glasses = CustomDataSet(CELEB_A_DIR, glasses_off)
+
+    glasses = np.load(GLASSES_NPY_DIR)  # x-y-z
+    glasses = fix_glasses(glasses)
+
+    agent_glasses = GlassesModelAgent(dataset_with_glasses, dataset_without_glasses, glasses, BATCH_SIZE_GLASSES,
+                                      BATCH_SIZE_WITHOUT_GLASSES)
+    agent_glasses.train()
 

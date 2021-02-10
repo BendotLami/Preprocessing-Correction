@@ -6,7 +6,7 @@ import torch.utils.data as data
 import numpy as np
 import matplotlib.pyplot as plt
 
-from models import *
+from GlassesModel import *
 
 # utils functions, move to diff file in future
 image_counter = 0
@@ -37,15 +37,15 @@ def concatenate_glasses_and_foreground(glasses, BG_images):
     return imageComp
 
 
-class ModelAgent(object):
+class GlassesModelAgent(object):
     def __init__(self, dataset_with_glasses, dataset_without_glasses, glasses, batch_size_glasses, batch_size_without_glasses):
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-        self.model_G = GeneratorNet().to(self.device)
+        self.model_G = GlassesGeneratorNet().to(self.device)
         self.optimizer_G = optim.Adam(self.model_G.parameters(), lr=0.01)
         self.lr_scheduler_G = optim.lr_scheduler.StepLR(self.optimizer_G, step_size=800000, gamma=0.1)
 
-        self.model_D = DiscriminatorNet().to(self.device)
+        self.model_D = GlassesDiscriminatorNet().to(self.device)
         self.optimizer_D = optim.Adam(self.model_D.parameters(), lr=0.01)
         self.lr_scheduler_D = optim.lr_scheduler.StepLR(self.optimizer_D, step_size=800000, gamma=0.1)
 
@@ -61,7 +61,6 @@ class ModelAgent(object):
         self.dplambda = 0.1
         self.pertFG = 0.1
 
-
     def gradient_penalty(self, y, x):
         """Compute gradient penalty: (L2_norm(dy/dx) - 1)**2."""
         weight = torch.ones(y.size()).to(self.device)
@@ -75,10 +74,6 @@ class ModelAgent(object):
         dydx = dydx.view(dydx.size(0), -1)
         dydx_l2norm = torch.sqrt(torch.sum(dydx**2, dim=1))
         return torch.mean((dydx_l2norm-1)**2)
-
-
-    def preprocess_celebA(self, folder_path):
-        pass
 
     def train_G(self, FG_images, BG_images):
         FG_images = FG_images.to(self.device)

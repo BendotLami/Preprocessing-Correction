@@ -20,9 +20,9 @@ class GeneratorConvolutionLayer(nn.Module):
         feat = torch.cat([feat, image_concat], dim=1)
         return feat, image_concat
 
-class GeneratorNet(nn.Module):
+class GlassesGeneratorNet(nn.Module):
     def __init__(self):
-        super(GeneratorNet, self).__init__()
+        super(GlassesGeneratorNet, self).__init__()
 
         in_layers = 7
 
@@ -35,12 +35,11 @@ class GeneratorNet(nn.Module):
         in_layers += 7
         self.conv4 = GeneratorConvolutionLayer(in_layers, in_layers, 4, 2, 1)
         in_layers += 7
-        self.conv5 = GeneratorConvolutionLayer(in_layers, in_layers, 4, 2, 2)
+        self.conv5 = GeneratorConvolutionLayer(in_layers, in_layers, 4, 2, 1)
 
         in_layers += 7
         # self.total_conv = nn.Sequential(*self.conv_layers)
-
-        self.linear_layer_1 = nn.Sequential(nn.Linear((in_layers)*5*5, 256), nn.ReLU(True))
+        self.linear_layer_1 = nn.Sequential(nn.Linear((in_layers)*8*8, 256), nn.ReLU(True))
         self.linear_layer_2 = nn.Sequential(nn.Linear(256, 6))
 
     def downsample(self, x):
@@ -75,9 +74,9 @@ class GeneratorNet(nn.Module):
         return FG_after_transform, theta, feat
 
 
-class DiscriminatorNet(nn.Module):
+class GlassesDiscriminatorNet(nn.Module):
     def __init__(self):
-        super(DiscriminatorNet, self).__init__()
+        super(GlassesDiscriminatorNet, self).__init__()
         self.conv_layers = []
         in_layers = 3
         for i in range(4):
