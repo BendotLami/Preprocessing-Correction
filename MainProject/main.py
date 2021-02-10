@@ -11,12 +11,26 @@ from torch.utils.data import Dataset
 import natsort
 import os
 from PIL import Image
+import json
 
-from preprocess_model import *
-from ModelAgent2 import *
+# from preprocess_model import *
+from ColorCorrectionAgent import *
 
 CELEB_A_DIR = "/home/dcor/datasets/CelebAMask-HQ/CelebA-HQ-img/"
 GLASSES_NPY_DIR = "/home/dcor/ronmokady/workshop21/team4/glasses.npy"
+CELEB_A_ANNO = "/home/dcor/datasets/CelebAMask-HQ/CelebAMask-HQ-attribute-anno.txt"
+DEFAULT_CONFIG = """
+{
+"color-correction": {
+    "epochs": 100,
+    "batch-size": 64,
+    "learning-rate": 0.002,
+    "lr-scheduler": {
+        "step-size": 800000,
+        "gamma": 0.1
+    }
+}
+}"""
 
 BATCH_SIZE_GLASSES = 16
 BATCH_SIZE_WITHOUT_GLASSES = 16
@@ -24,9 +38,15 @@ BATCH_SIZE_WITHOUT_GLASSES = 16
 # TODO: move to different file, data.py
 
 class CustomDataSet(Dataset):
-    def __init__(self, main_dir, transform, img_list):
+    def __init__(self, main_dir, img_list):
+        TRANSFORM_IMG = torchvision.transforms.Compose([
+            torchvision.transforms.Resize(256),
+            torchvision.transforms.CenterCrop(256),
+            torchvision.transforms.ToTensor()
+        ])
+
         self.main_dir = main_dir
-        self.transform = transform
+        self.transform = TRANSFORM_IMG
         img_list = img_list[:1000]  # TODO: temporary
         all_jpg = [i for i in img_list if i.endswith('.jpg')]
         self.total_imgs = natsort.natsorted(all_jpg)
@@ -71,56 +91,20 @@ def fix_glasses(glasses):
 
     return glasses
 
-# if __name__ == "__main__":
-#     # plt.ion()   # interactive mode
-#     TRANSFORM_IMG = torchvision.transforms.Compose([
-#         torchvision.transforms.Resize(144),
-#         torchvision.transforms.CenterCrop(144),
-#         torchvision.transforms.ToTensor()
-#     ])
-#
-#     glasses_on, glasses_off = get_img_lists('/home/dcor/datasets/CelebAMask-HQ/CelebAMask-HQ-attribute-anno.txt')
-#
-#     dataset_with_glasses = CustomDataSet(CELEB_A_DIR, TRANSFORM_IMG, glasses_on)
-#     dataset_without_glasses = CustomDataSet(CELEB_A_DIR, TRANSFORM_IMG, glasses_off)
-#
-#     glasses = np.load(GLASSES_NPY_DIR)  # x-y-z
-#     glasses = fix_glasses(glasses)
-#
-#     agent = ModelAgent(dataset_with_glasses, dataset_without_glasses, glasses, BATCH_SIZE_GLASSES,
-#                        BATCH_SIZE_WITHOUT_GLASSES)
-#
-#     agent.train()
-
 
 if __name__ == "__main__":
-    # plt.ion()   # interactive mode
-    TRANSFORM_IMG = torchvision.transforms.Compose([
-        torchvision.transforms.Resize(144),
-        torchvision.transforms.CenterCrop(144),
-        torchvision.transforms.ToTensor()
-    ])
-    TRANSFORM_IMG_COLOR = torchvision.transforms.Compose([
-        torchvision.transforms.Resize(144),
-        torchvision.transforms.CenterCrop(144),
-        torchvision.transforms.ColorJitter(brightness=0.5, contrast=0.5),
-        torchvision.transforms.ToTensor()
-    ])
+    try:
+        with open("./config.json", 'r') as f:
+            config_dict = json.load(f)
+    except FileNotFoundError:
+        print("Couldn't find config.json, running with default config")
+        config_dict = json.loads(DEFAULT_CONFIG)
 
-    glasses_on, glasses_off = get_img_lists('/home/dcor/datasets/CelebAMask-HQ/CelebAMask-HQ-attribute-anno.txt')
-
+    glasses_on, glasses_off = get_img_lists(CELEB_A_ANNO)
     all_images = np.concatenate((glasses_on, glasses_off))
+    dataset_all = CustomDataSet(CELEB_A_DIR, all_images)
 
-    dataset_original = CustomDataSet(CELEB_A_DIR, TRANSFORM_IMG, all_images)
-    # dataset_color_change = CustomDataSet(CELEB_A_DIR, TRANSFORM_IMG, all_images)
-
-    # dataset_without_glasses = CustomDataSet(CELEB_A_DIR, TRANSFORM_IMG, glasses_off)
-
-    # glasses = np.load(GLASSES_NPY_DIR)  # x-y-z
-    # glasses = fix_glasses(glasses)
-
-    agent = ModelAgentColorCorrection(dataset_original)
-
-    agent.train()
-
+    # Color correction model
+    agent_color_correction = ModelAgentColorCorrection(dataset_all, config_dict['color-correction'])
+    agent_color_correction.train()
 
