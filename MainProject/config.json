@@ -1,5 +1,13 @@
 {
+  "run-settings":
+  {
+    "train-color-correction": false,
+    "train-glasses": false,
+    "train-srresnet": false,
+    "train-srgan": false
+  },
   "color-correction": {
+    "pre-trained-path": "/home/dcor/ronmokady/workshop21/team4/MainProject/ColorCorrectionRun/Model_Weights/weights_70",
     "epochs": 100,
     "batch-size": 64,
     "learning-rate": 0.002,
@@ -7,5 +15,27 @@
       "step-size": 800000,
       "gamma": 0.1
     }
+  },
+  "glasses": {
+    "generator":
+    {
+      "pre-trained-path": "./",
+      "lr": 0.01,
+      "step_size": 800000,
+      "gamma": 0.1
+    },
+    "discriminator": {
+      "pre-trained-path": "./",
+      "lr": 0.01,
+      "step_size": 800000,
+      "gamma": 0.1
+    },
+    "lambda_gp": 0.1,
+    "dplambda": 0.1,
+    "pertFG": 0.1
+  },
+  "super-resolution": {
+    "pre-trained-path-srresnet": "./",
+    "pre-trained-path-srgan": "./"
   }
 }

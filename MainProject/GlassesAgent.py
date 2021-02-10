@@ -38,16 +38,16 @@ def concatenate_glasses_and_foreground(glasses, BG_images):
 
 
 class GlassesModelAgent(object):
-    def __init__(self, dataset_with_glasses, dataset_without_glasses, glasses, batch_size_glasses, batch_size_without_glasses):
+    def __init__(self, dataset_with_glasses, dataset_without_glasses, glasses, batch_size_glasses, batch_size_without_glasses, config):
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
         self.model_G = GlassesGeneratorNet().to(self.device)
-        self.optimizer_G = optim.Adam(self.model_G.parameters(), lr=0.01)
-        self.lr_scheduler_G = optim.lr_scheduler.StepLR(self.optimizer_G, step_size=800000, gamma=0.1)
+        self.optimizer_G = optim.Adam(self.model_G.parameters(), lr=config["generator"]["lr"])
+        self.lr_scheduler_G = optim.lr_scheduler.StepLR(self.optimizer_G, step_size=config["generator"]["step_size"], gamma=config["generator"]["gamma"])
 
         self.model_D = GlassesDiscriminatorNet().to(self.device)
-        self.optimizer_D = optim.Adam(self.model_D.parameters(), lr=0.01)
-        self.lr_scheduler_D = optim.lr_scheduler.StepLR(self.optimizer_D, step_size=800000, gamma=0.1)
+        self.optimizer_D = optim.Adam(self.model_D.parameters(), lr=0.01) # TODO: config
+        self.lr_scheduler_D = optim.lr_scheduler.StepLR(self.optimizer_D, step_size=800000, gamma=0.1) # TODO: config
 
         self.dataset_with_glasses = dataset_with_glasses  # Dataset
         self.dataset_without_glasses = dataset_without_glasses  # Dataset
@@ -175,3 +175,15 @@ class GlassesModelAgent(object):
                 print("Done batch!")
 
             print_images_to_folder(without_g.cpu().detach(), fake_img_D.cpu().detach(), fake_img_G.cpu().detach(), glasses_batch.cpu().detach())
+
+    def load_model_from_dict(self, path_generator, path_discriminator):
+        self.model_G.load_state_dict(torch.load(path_generator))
+        self.model_D.load_state_dict(torch.load(path_discriminator))
+
+    def forward_pass(self, img, glasses):
+        with torch.no_grad():
+            pPertFG = torch.normal(torch.zeros((1, 6)), torch.ones((1, 6)) * self.pertFG).to(self.device)
+            glasses_transformed, _, _ = self.model_G(glasses, img, pPertFG)
+            glasses_transformed = glasses_transformed.to(self.device)
+            fake_images = concatenate_glasses_and_foreground(glasses_transformed, img)
+            return fake_images

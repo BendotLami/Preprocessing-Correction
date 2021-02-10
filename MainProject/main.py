@@ -14,6 +14,14 @@ from PIL import Image
 import json
 import cv2
 
+from SuperResolutionModel.train_srresnet import main as SRresnet_train
+from SuperResolutionModel.train_srgan import main as SRgan_train, set_srresnet_checkpoint
+
+import sys
+
+sys.path.insert(0, './SuperResolutionModel/eval.py')
+# from SuperResolutionModel.eval import *
+
 # from preprocess_model import *
 from ColorCorrectionAgent import *
 from GlassesAgent import *
@@ -39,6 +47,7 @@ DEFAULT_CONFIG = """
 BATCH_SIZE_GLASSES = 16
 BATCH_SIZE_WITHOUT_GLASSES = 16
 
+
 # TODO: move to different file, data.py
 
 class CustomDataSet(Dataset):
@@ -63,6 +72,7 @@ class CustomDataSet(Dataset):
         image = Image.open(img_loc).convert("RGB")
         tensor_image = self.transform(image)
         return tensor_image
+
 
 # class
 
@@ -116,8 +126,11 @@ if __name__ == "__main__":
     dataset_all = CustomDataSet(CELEB_A_DIR, all_images)
 
     # Color correction model
-    # agent_color_correction = ModelAgentColorCorrection(dataset_all, config_dict['color-correction'])
-    # agent_color_correction.train()
+    agent_color_correction = ModelAgentColorCorrection(dataset_all, config_dict['color-correction'])
+    if config_dict["run-settings"]["train-color-correction"]:
+        agent_color_correction.train()
+    else:
+        agent_color_correction.load_model_from_dict(config_dict['color-correction']['pre-trained-path'])
 
     # Glasses model
     dataset_with_glasses = CustomDataSet(CELEB_A_DIR, glasses_on)
@@ -127,6 +140,16 @@ if __name__ == "__main__":
     glasses = fix_glasses(glasses)
 
     agent_glasses = GlassesModelAgent(dataset_with_glasses, dataset_without_glasses, glasses, BATCH_SIZE_GLASSES,
-                                      BATCH_SIZE_WITHOUT_GLASSES)
-    agent_glasses.train()
+                                      BATCH_SIZE_WITHOUT_GLASSES, config_dict['glasses'])
+    if config_dict["run-settings"]["train-glasses"]:
+        agent_glasses.train()
+    else:
+        agent_glasses.load_model_from_dict(config_dict['glasses']['generator']['pre-trained-path'],
+                                           config_dict['glasses']['discriminator']['pre-trained-path'])
 
+    # Super resolution
+    if config_dict["run-settings"]["train-srresnet"]:
+        SRresnet_train()
+    if config_dict["run-settings"]["train-srgan"]:
+        set_srresnet_checkpoint(config_dict['super-resolution']['pre-trained-path-srresnet'])
+        SRgan_train()

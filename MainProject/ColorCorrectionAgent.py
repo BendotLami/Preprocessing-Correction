@@ -109,3 +109,11 @@ class ModelAgentColorCorrection(object):
             torch.save(self.model.state_dict(), str("./Model_Weights/" + "weights" + "_" + str(epoch)))
 
             print("Done epoch", epoch, "!")
+
+    def load_model_from_dict(self, path):
+        self.model.load_state_dict(torch.load(path))
+
+    def forward_pass(self, img):
+        with torch.no_grad():
+            rtn_img = self.model(img)
+        return rtn_img
