@@ -36,12 +36,12 @@ def save_images(images, lr_images):
     global image_counter
     for i in range(images.shape[0]):
         real = images[i].numpy().transpose(1, 2, 0)
-        print(real.dtype, np.max(real), np.min(real))
+        # print(real.dtype, np.max(real), np.min(real))
         real = (real + 1.) / 2.
         real = np.clip(real, 0, 1)
 
         lr_real = lr_images[i].numpy().transpose(1, 2, 0)
-        print(lr_real.dtype, np.max(lr_real), np.min(lr_real))
+        # print(lr_real.dtype, np.max(lr_real), np.min(lr_real))
         lr_real = (lr_real + 2.) / 4.
         lr_real = np.clip(lr_real, 0, 1)
 
@@ -62,7 +62,7 @@ def model_forward_pass(img):
     return rtn_img
 
 
-print("\n")
+# print("\n")
 
 if __name__ == "__main__":
     srresnet = torch.load(srresnet_checkpoint)['model'].to(device)

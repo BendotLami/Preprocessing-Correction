@@ -25,6 +25,7 @@ from SuperResolutionModel.eval import *
 # from preprocess_model import *
 from ColorCorrectionAgent import *
 from GlassesAgent import *
+from RotationAgent import *
 
 IMAGE_SIZE = 256
 
@@ -126,33 +127,45 @@ if __name__ == "__main__":
     dataset_all = CustomDataSet(CELEB_A_DIR, all_images)
 
     # Color correction model
-    agent_color_correction = ModelAgentColorCorrection(dataset_all, config_dict['color-correction'])
-    if config_dict["run-settings"]["train-color-correction"]:
-        agent_color_correction.train()
-    else:
-        agent_color_correction.load_model_from_dict(config_dict['color-correction']['pre-trained-path'])
-
-    # Glasses model
-    dataset_with_glasses = CustomDataSet(CELEB_A_DIR, glasses_on)
-    dataset_without_glasses = CustomDataSet(CELEB_A_DIR, glasses_off)
-
-    glasses = np.load(GLASSES_NPY_DIR)  # x-y-z
-    glasses = fix_glasses(glasses)
-
-    agent_glasses = GlassesModelAgent(dataset_with_glasses, dataset_without_glasses, glasses, BATCH_SIZE_GLASSES,
-                                      BATCH_SIZE_WITHOUT_GLASSES, config_dict['glasses'])
-    if config_dict["run-settings"]["train-glasses"]:
-        agent_glasses.train()
-    else:
-        agent_glasses.load_model_from_dict(config_dict['glasses']['generator']['pre-trained-path'],
-                                           config_dict['glasses']['discriminator']['pre-trained-path'])
+    # agent_color_correction = ModelAgentColorCorrection(dataset_all, config_dict['color-correction'])
+    # if config_dict["run-settings"]["train-color-correction"]:
+    #     print("Starting color-correction training...")
+    #     agent_color_correction.train()
+    # else:
+    #     agent_color_correction.load_model_from_dict(config_dict['color-correction']['pre-trained-path'])
+    #
+    # # Glasses model
+    # dataset_with_glasses = CustomDataSet(CELEB_A_DIR, glasses_on)
+    # dataset_without_glasses = CustomDataSet(CELEB_A_DIR, glasses_off)
+    #
+    # glasses = np.load(GLASSES_NPY_DIR)  # x-y-z
+    # glasses = fix_glasses(glasses)
+    #
+    # agent_glasses = GlassesModelAgent(dataset_with_glasses, dataset_without_glasses, glasses, BATCH_SIZE_GLASSES,
+    #                                   BATCH_SIZE_WITHOUT_GLASSES, config_dict['glasses'])
+    # if config_dict["run-settings"]["train-glasses"]:
+    #     print("Starting glasses training...")
+    #     agent_glasses.train()
+    # else:
+    #     agent_glasses.load_model_from_dict(config_dict['glasses']['generator']['pre-trained-path'],
+    #                                        config_dict['glasses']['discriminator']['pre-trained-path'])
 
     # Rotation model
+    agent_rotation = RotationCorrectionAgent(dataset_all, config_dict['rotation'])
+    if config_dict["run-settings"]["train-rotation"]:
+        print("Starting rotation-correction training...")
+        agent_rotation.train()
+    else:
+        agent_rotation.load_model_from_dict(config_dict['rotation']['pre-trained-path'])
+
+    agent_rotation.forward_pass(dataset_all[7])
 
     # Super resolution
     if config_dict["run-settings"]["train-srresnet"]:
+        print("Starting SRresnet training...")
         SRresnet_train()
     if config_dict["run-settings"]["train-srgan"]:
         set_srresnet_checkpoint(config_dict['super-resolution']['pre-trained-path-srresnet'])
+        print("Starting SRgan training...")
         SRgan_train()
 

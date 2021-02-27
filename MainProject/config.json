@@ -4,7 +4,8 @@
     "train-color-correction": true,
     "train-glasses": true,
     "train-srresnet": false,
-    "train-srgan": false
+    "train-srgan": false,
+    "train-rotation": false
   },
   "color-correction": {
     "pre-trained-path": "/home/dcor/ronmokady/workshop21/team4/MainProject/ColorCorrectionRun/Model_Weights/weights_70",
@@ -37,5 +38,12 @@
   "super-resolution": {
     "pre-trained-path-srresnet": "./",
     "pre-trained-path-srgan": "/home/dcor/ronmokady/workshop21/team4/MainProject/Final_Project/checkpoint_srgan.pth.tar"
+  },
+  "rotation": {
+    "pre-trained-path": "/home/dcor/ronmokady/workshop21/team4/MainProject/RotationCorrectionRun/Model_Weights/gen_weights_90",
+    "lr": 0.01,
+    "step_size": 800000,
+    "gamma": 0.1,
+    "batch-size": 16
   }
 }

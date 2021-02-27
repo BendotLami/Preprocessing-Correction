@@ -5,6 +5,7 @@ import torch.optim as optim
 import torch.utils.data as data
 import numpy as np
 import matplotlib.pyplot as plt
+import os
 
 from GlassesModel import *
 
@@ -13,6 +14,9 @@ image_counter = 0
 
 
 def print_images_to_folder(real_img, fake_img_D, fake_img_G, glasses, path='./debug_outputs/'):
+    if os.path.exists(path):
+        os.makedirs(path)
+
     global image_counter
     for i in range(real_img.shape[0]):
         real = real_img[i].numpy().transpose(1, 2, 0)
