@@ -106,7 +106,7 @@ class ModelAgentColorCorrection(object):
 
                         save_idx += 1
 
-            torch.save(self.model.state_dict(), str("./Model_Weights/" + "weights" + "_" + str(epoch)))
+            torch.save(self.model.state_dict(), str("./Model_Weights/" + "ColorCorrection" + "_" + str(epoch)))
 
             print("Done epoch", epoch, "!")
 

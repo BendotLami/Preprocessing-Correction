@@ -175,6 +175,8 @@ class GlassesModelAgent(object):
                 print("Done batch!")
 
             print_images_to_folder(without_g.cpu().detach(), fake_img_D.cpu().detach(), fake_img_G.cpu().detach(), glasses_batch.cpu().detach())
+            torch.save(self.model_D.state_dict(), str("./Model_Weights/" + "glasses_disc" + "_" + str(epoch)))
+            torch.save(self.model_G.state_dict(), str("./Model_Weights/" + "glasses_gen" + "_" + str(epoch)))
 
     def load_model_from_dict(self, path_generator, path_discriminator):
         self.model_G.load_state_dict(torch.load(path_generator))

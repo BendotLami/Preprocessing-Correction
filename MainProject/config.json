@@ -1,8 +1,8 @@
 {
   "run-settings":
   {
-    "train-color-correction": false,
-    "train-glasses": false,
+    "train-color-correction": true,
+    "train-glasses": true,
     "train-srresnet": false,
     "train-srgan": false
   },
@@ -36,6 +36,6 @@
   },
   "super-resolution": {
     "pre-trained-path-srresnet": "./",
-    "pre-trained-path-srgan": "./"
+    "pre-trained-path-srgan": "/home/dcor/ronmokady/workshop21/team4/MainProject/Final_Project/checkpoint_srgan.pth.tar"
   }
 }

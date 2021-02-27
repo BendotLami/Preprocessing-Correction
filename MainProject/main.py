@@ -19,8 +19,8 @@ from SuperResolutionModel.train_srgan import main as SRgan_train, set_srresnet_c
 
 import sys
 
-sys.path.insert(0, './SuperResolutionModel/eval.py')
-# from SuperResolutionModel.eval import *
+sys.path.insert(0, './SuperResolutionModel')
+from SuperResolutionModel.eval import *
 
 # from preprocess_model import *
 from ColorCorrectionAgent import *
@@ -147,9 +147,12 @@ if __name__ == "__main__":
         agent_glasses.load_model_from_dict(config_dict['glasses']['generator']['pre-trained-path'],
                                            config_dict['glasses']['discriminator']['pre-trained-path'])
 
+    # Rotation model
+
     # Super resolution
     if config_dict["run-settings"]["train-srresnet"]:
         SRresnet_train()
     if config_dict["run-settings"]["train-srgan"]:
         set_srresnet_checkpoint(config_dict['super-resolution']['pre-trained-path-srresnet'])
         SRgan_train()
+
