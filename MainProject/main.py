@@ -22,16 +22,10 @@ import sys
 sys.path.insert(0, './SuperResolutionModel')
 from SuperResolutionModel.eval import *
 
-# from preprocess_model import *
 from ColorCorrectionAgent import *
 from GlassesAgent import *
 from RotationAgent import *
 
-IMAGE_SIZE = 256
-
-CELEB_A_DIR = "/home/dcor/datasets/CelebAMask-HQ/CelebA-HQ-img/"
-GLASSES_NPY_DIR = "/home/dcor/ronmokady/workshop21/team4/glasses.npy"
-CELEB_A_ANNO = "/home/dcor/datasets/CelebAMask-HQ/CelebAMask-HQ-attribute-anno.txt"
 DEFAULT_CONFIG = """
 {
 "color-correction": {
@@ -61,7 +55,7 @@ class CustomDataSet(Dataset):
 
         self.main_dir = main_dir
         self.transform = TRANSFORM_IMG
-        img_list = img_list[:1000]  # TODO: temporary
+        # img_list = img_list[:1000]  # TODO: temporary
         all_jpg = [i for i in img_list if i.endswith('.jpg')]
         self.total_imgs = natsort.natsorted(all_jpg)
 
@@ -122,33 +116,38 @@ if __name__ == "__main__":
         print("Couldn't find config.json, running with default config")
         config_dict = json.loads(DEFAULT_CONFIG)
 
+    IMAGE_SIZE = config_dict['run-settings']['image_size']
+    CELEB_A_DIR = config_dict['run-settings']['celeb_a_dir']
+    GLASSES_NPY_DIR = config_dict['run-settings']['glasses_npy_dir']
+    CELEB_A_ANNO = config_dict['run-settings']['celeb_a_anno']
+
     glasses_on, glasses_off = get_img_lists(CELEB_A_ANNO)
     all_images = np.concatenate((glasses_on, glasses_off))
     dataset_all = CustomDataSet(CELEB_A_DIR, all_images)
 
     # Color correction model
-    # agent_color_correction = ModelAgentColorCorrection(dataset_all, config_dict['color-correction'])
-    # if config_dict["run-settings"]["train-color-correction"]:
-    #     print("Starting color-correction training...")
-    #     agent_color_correction.train()
-    # else:
-    #     agent_color_correction.load_model_from_dict(config_dict['color-correction']['pre-trained-path'])
-    #
-    # # Glasses model
-    # dataset_with_glasses = CustomDataSet(CELEB_A_DIR, glasses_on)
-    # dataset_without_glasses = CustomDataSet(CELEB_A_DIR, glasses_off)
-    #
-    # glasses = np.load(GLASSES_NPY_DIR)  # x-y-z
-    # glasses = fix_glasses(glasses)
-    #
-    # agent_glasses = GlassesModelAgent(dataset_with_glasses, dataset_without_glasses, glasses, BATCH_SIZE_GLASSES,
-    #                                   BATCH_SIZE_WITHOUT_GLASSES, config_dict['glasses'])
-    # if config_dict["run-settings"]["train-glasses"]:
-    #     print("Starting glasses training...")
-    #     agent_glasses.train()
-    # else:
-    #     agent_glasses.load_model_from_dict(config_dict['glasses']['generator']['pre-trained-path'],
-    #                                        config_dict['glasses']['discriminator']['pre-trained-path'])
+    agent_color_correction = ModelAgentColorCorrection(dataset_all, config_dict['color-correction'])
+    if config_dict["run-settings"]["train-color-correction"]:
+        print("Starting color-correction training...")
+        agent_color_correction.train()
+    else:
+        agent_color_correction.load_model_from_dict(config_dict['color-correction']['pre-trained-path'])
+
+    # Glasses model
+    dataset_with_glasses = CustomDataSet(CELEB_A_DIR, glasses_on)
+    dataset_without_glasses = CustomDataSet(CELEB_A_DIR, glasses_off)
+
+    glasses = np.load(GLASSES_NPY_DIR)  # x-y-z
+    glasses = fix_glasses(glasses)
+
+    agent_glasses = GlassesModelAgent(dataset_with_glasses, dataset_without_glasses, glasses, BATCH_SIZE_GLASSES,
+                                      BATCH_SIZE_WITHOUT_GLASSES, config_dict['glasses'])
+    if config_dict["run-settings"]["train-glasses"]:
+        print("Starting glasses training...")
+        agent_glasses.train()
+    else:
+        agent_glasses.load_model_from_dict(config_dict['glasses']['generator']['pre-trained-path'],
+                                           config_dict['glasses']['discriminator']['pre-trained-path'])
 
     # Rotation model
     agent_rotation = RotationCorrectionAgent(dataset_all, config_dict['rotation'])
@@ -158,8 +157,6 @@ if __name__ == "__main__":
     else:
         agent_rotation.load_model_from_dict(config_dict['rotation']['pre-trained-path'])
 
-    agent_rotation.forward_pass(dataset_all[7])
-
     # Super resolution
     if config_dict["run-settings"]["train-srresnet"]:
         print("Starting SRresnet training...")
@@ -168,4 +165,28 @@ if __name__ == "__main__":
         set_srresnet_checkpoint(config_dict['super-resolution']['pre-trained-path-srresnet'])
         print("Starting SRgan training...")
         SRgan_train()
+    else:
+        srgan_load_model(config_dict['super-resolution']['pre-trained-path-srgan'])
 
+    if config_dict['run-settings']['eval-network']:
+        dataset_eval = CustomDataSet(config_dict['run-settings']['eval-dataset-path'], all_images)
+        index = 0
+        with torch.no_grad():
+            test_data_loader = torch.utils.data.DataLoader(dataset_eval, batch_size=1, shuffle=True)
+            for batch_data_test in test_data_loader:
+                index += 1
+                glasses_batch = glasses[np.random.choice(glasses.shape[0], 1)]
+                glasses_batch = torch.from_numpy(glasses_batch)
+                glasses_batch = glasses_batch.to(device)
+                batch_data_test = batch_data_test.to(device)
+
+                img_eval = agent_color_correction.forward_pass(batch_data_test)
+                img_eval = agent_glasses.forward_pass(img_eval, glasses_batch)
+                img_eval = agent_rotation.forward_pass(img_eval)
+                img_eval = SRgan_forward_pass(img_eval)
+
+                for img_index in range(int(len(batch_data_test.cpu()))):
+                    output_img = img_eval[img_index].cpu().numpy().transpose(1, 2, 0)
+                    output_img = np.clip(output_img, 0, 1)
+                    plt.imsave(str("./" + str(index) + "_" + str(img_index) + "_eval.jpg"),
+                               output_img)

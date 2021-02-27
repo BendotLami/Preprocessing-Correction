@@ -2,10 +2,17 @@
   "run-settings":
   {
     "train-color-correction": true,
-    "train-glasses": true,
+    "train-glasses": false,
     "train-srresnet": false,
     "train-srgan": false,
-    "train-rotation": false
+    "train-rotation": false,
+    "eval-network": true,
+    "eval-dataset-path": "/home/dcor/datasets/CelebAMask-HQ/CelebA-HQ-img/",
+
+    "image_size": 256,
+    "celeb_a_dir" : "/home/dcor/datasets/CelebAMask-HQ/CelebA-HQ-img/",
+    "glasses_npy_dir" : "/home/dcor/ronmokady/workshop21/team4/glasses.npy",
+    "celeb_a_anno" : "/home/dcor/datasets/CelebAMask-HQ/CelebAMask-HQ-attribute-anno.txt"
   },
   "color-correction": {
     "pre-trained-path": "/home/dcor/ronmokady/workshop21/team4/MainProject/ColorCorrectionRun/Model_Weights/weights_70",

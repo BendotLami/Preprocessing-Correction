@@ -128,4 +128,6 @@ class RotationCorrectionAgent(object):
             img = img[None, :, :, :]
         with torch.no_grad():
             rot_img = self.model(img.to(self.device))
-            return rot_img
+            for i in range(img.shape[0]):
+                img[i] = torchvision.transforms.functional.rotate(img[i], -1 * float(torch.argmax(rot_img[i]))).to(self.device)
+            return img

@@ -23,7 +23,7 @@ model = None
 image_counter = 0
 
 
-def load_model(checkpoint):
+def srgan_load_model(checkpoint):
     global model
     srgan_generator = torch.load(checkpoint)['generator'].to(device)
     srgan_generator.eval()
@@ -51,7 +51,7 @@ def save_images(images, lr_images):
     print("Done printing! count:", image_counter)
 
 
-def model_forward_pass(img):
+def SRgan_forward_pass(img):
     global model
     model.eval().to(device)
     if len(img.size()) < 4:  # if we want to forward pass a single image

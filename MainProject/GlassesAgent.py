@@ -50,8 +50,8 @@ class GlassesModelAgent(object):
         self.lr_scheduler_G = optim.lr_scheduler.StepLR(self.optimizer_G, step_size=config["generator"]["step_size"], gamma=config["generator"]["gamma"])
 
         self.model_D = GlassesDiscriminatorNet().to(self.device)
-        self.optimizer_D = optim.Adam(self.model_D.parameters(), lr=0.01) # TODO: config
-        self.lr_scheduler_D = optim.lr_scheduler.StepLR(self.optimizer_D, step_size=800000, gamma=0.1) # TODO: config
+        self.optimizer_D = optim.Adam(self.model_D.parameters(), lr=config["discriminator"]["lr"])
+        self.lr_scheduler_D = optim.lr_scheduler.StepLR(self.optimizer_D, step_size=config["discriminator"]["step_size"], gamma=config["discriminator"]["gamma"])
 
         self.dataset_with_glasses = dataset_with_glasses  # Dataset
         self.dataset_without_glasses = dataset_without_glasses  # Dataset
@@ -60,10 +60,9 @@ class GlassesModelAgent(object):
         self.batch_size_glasses = batch_size_glasses
         self.batch_size_without_glasses = batch_size_without_glasses
 
-        # TODO: move to config
-        self.lambda_gp = 0.1
-        self.dplambda = 0.1
-        self.pertFG = 0.1
+        self.lambda_gp = config["lambda_gp"]
+        self.dplambda = config["dplambda"]
+        self.pertFG = config["pertFG"]
 
     def gradient_penalty(self, y, x):
         """Compute gradient penalty: (L2_norm(dy/dx) - 1)**2."""
@@ -97,8 +96,6 @@ class GlassesModelAgent(object):
         dp_sqnorm = torch.sum(dp**2+1e-8, dim=1)
         loss_GP_dpnorm = torch.mean(dp_sqnorm)
 
-        # TODO: add loss using [glasses_transformed, BG_images]
-
         # target-to-original domain
         # x_reconst = self.model_G(x_real, c_org - c_org)
         # g_loss_rec = torch.mean(torch.abs(x_real - x_reconst))
@@ -128,7 +125,7 @@ class GlassesModelAgent(object):
         out_src = self.model_D(fake_images.detach()).to(self.device)
         d_loss_fake = torch.mean(out_src)
 
-        # compute loss for gradient penalty # TODO: maybe will be useful in the future
+        # compute loss for gradient penalty
         minimum_batch_size = np.min((fake_images.size(0), real_images.size(0)))
         x_real = real_images[:minimum_batch_size, :, :, :]
         x_fake = fake_images[:minimum_batch_size, :, :, :]
@@ -188,6 +185,8 @@ class GlassesModelAgent(object):
 
     def forward_pass(self, img, glasses):
         with torch.no_grad():
+            img = img.to(self.device)
+            glasses = glasses.to(self.device)
             pPertFG = torch.normal(torch.zeros((1, 6)), torch.ones((1, 6)) * self.pertFG).to(self.device)
             glasses_transformed, _, _ = self.model_G(glasses, img, pPertFG)
             glasses_transformed = glasses_transformed.to(self.device)

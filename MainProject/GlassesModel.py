@@ -53,6 +53,8 @@ class GlassesGeneratorNet(nn.Module):
         grid = F.affine_grid(theta, FG.size())
         FG_start = F.grid_sample(FG, grid)
 
+        print(FG_start.size(), BG.size())
+
         image_concat = torch.cat([FG_start, BG], dim=1)
         feat = image_concat  # TODO: make sure this is a copy!
 

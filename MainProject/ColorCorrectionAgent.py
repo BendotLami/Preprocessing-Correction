@@ -115,5 +115,6 @@ class ModelAgentColorCorrection(object):
 
     def forward_pass(self, img):
         with torch.no_grad():
-            rtn_img = self.model(img)
+            alpha_beta = self.model(img)
+            rtn_img = self.fix_image(img, alpha_beta).cpu()
         return rtn_img
