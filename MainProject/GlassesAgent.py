@@ -14,7 +14,7 @@ image_counter = 0
 
 
 def print_images_to_folder(real_img, fake_img_D, fake_img_G, glasses, path='./debug_outputs/'):
-    if os.path.exists(path):
+    if not os.path.exists(path):
         os.makedirs(path)
 
     global image_counter

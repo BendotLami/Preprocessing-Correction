@@ -12,7 +12,12 @@
     "image_size": 256,
     "celeb_a_dir" : "/home/dcor/datasets/CelebAMask-HQ/CelebA-HQ-img/",
     "glasses_npy_dir" : "/home/dcor/ronmokady/workshop21/team4/glasses.npy",
-    "celeb_a_anno" : "/home/dcor/datasets/CelebAMask-HQ/CelebAMask-HQ-attribute-anno.txt"
+    "celeb_a_anno" : "/home/dcor/datasets/CelebAMask-HQ/CelebAMask-HQ-attribute-anno.txt",
+
+    "run-color-correction": true,
+    "run-glasses": true,
+    "run-super-resolution": true,
+    "run-rotation": true
   },
   "color-correction": {
     "pre-trained-path": "/home/dcor/ronmokady/workshop21/team4/MainProject/ColorCorrectionRun/Model_Weights/weights_70",

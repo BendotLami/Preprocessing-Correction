@@ -127,11 +127,12 @@ if __name__ == "__main__":
 
     # Color correction model
     agent_color_correction = ModelAgentColorCorrection(dataset_all, config_dict['color-correction'])
-    if config_dict["run-settings"]["train-color-correction"]:
-        print("Starting color-correction training...")
-        agent_color_correction.train()
-    else:
-        agent_color_correction.load_model_from_dict(config_dict['color-correction']['pre-trained-path'])
+    if config_dict['run-settings']['run-color-correction']:
+        if config_dict["run-settings"]["train-color-correction"]:
+            print("Starting color-correction training...")
+            agent_color_correction.train()
+        else:
+            agent_color_correction.load_model_from_dict(config_dict['color-correction']['pre-trained-path'])
 
     # Glasses model
     dataset_with_glasses = CustomDataSet(CELEB_A_DIR, glasses_on)
@@ -142,32 +143,37 @@ if __name__ == "__main__":
 
     agent_glasses = GlassesModelAgent(dataset_with_glasses, dataset_without_glasses, glasses, BATCH_SIZE_GLASSES,
                                       BATCH_SIZE_WITHOUT_GLASSES, config_dict['glasses'])
-    if config_dict["run-settings"]["train-glasses"]:
-        print("Starting glasses training...")
-        agent_glasses.train()
-    else:
-        agent_glasses.load_model_from_dict(config_dict['glasses']['generator']['pre-trained-path'],
-                                           config_dict['glasses']['discriminator']['pre-trained-path'])
+
+    if config_dict['run-settings']['run-glasses']:
+        if config_dict["run-settings"]["train-glasses"]:
+            print("Starting glasses training...")
+            agent_glasses.train()
+        else:
+            agent_glasses.load_model_from_dict(config_dict['glasses']['generator']['pre-trained-path'],
+                                               config_dict['glasses']['discriminator']['pre-trained-path'])
 
     # Rotation model
     agent_rotation = RotationCorrectionAgent(dataset_all, config_dict['rotation'])
-    if config_dict["run-settings"]["train-rotation"]:
-        print("Starting rotation-correction training...")
-        agent_rotation.train()
-    else:
-        agent_rotation.load_model_from_dict(config_dict['rotation']['pre-trained-path'])
+    if config_dict['run-settings']['run-rotation']:
+        if config_dict["run-settings"]["train-rotation"]:
+            print("Starting rotation-correction training...")
+            agent_rotation.train()
+        else:
+            agent_rotation.load_model_from_dict(config_dict['rotation']['pre-trained-path'])
 
     # Super resolution
-    if config_dict["run-settings"]["train-srresnet"]:
-        print("Starting SRresnet training...")
-        SRresnet_train()
-    if config_dict["run-settings"]["train-srgan"]:
-        set_srresnet_checkpoint(config_dict['super-resolution']['pre-trained-path-srresnet'])
-        print("Starting SRgan training...")
-        SRgan_train()
-    else:
-        srgan_load_model(config_dict['super-resolution']['pre-trained-path-srgan'])
+    if config_dict['run-settings']['run-super-resolution']:
+        if config_dict["run-settings"]["train-srresnet"]:
+            print("Starting SRresnet training...")
+            SRresnet_train()
+        if config_dict["run-settings"]["train-srgan"]:
+            set_srresnet_checkpoint(config_dict['super-resolution']['pre-trained-path-srresnet'])
+            print("Starting SRgan training...")
+            SRgan_train()
+        else:
+            srgan_load_model(config_dict['super-resolution']['pre-trained-path-srgan'])
 
+    # run dataset through the network
     if config_dict['run-settings']['eval-network']:
         dataset_eval = CustomDataSet(config_dict['run-settings']['eval-dataset-path'], all_images)
         index = 0
@@ -180,10 +186,15 @@ if __name__ == "__main__":
                 glasses_batch = glasses_batch.to(device)
                 batch_data_test = batch_data_test.to(device)
 
-                img_eval = agent_color_correction.forward_pass(batch_data_test)
-                img_eval = agent_glasses.forward_pass(img_eval, glasses_batch)
-                img_eval = agent_rotation.forward_pass(img_eval)
-                img_eval = SRgan_forward_pass(img_eval)
+                if config_dict['run-settings']['run-color-correction']:
+                    img_eval = agent_color_correction.forward_pass(batch_data_test)
+                if config_dict['run-settings']['run-glasses']:
+                    img_eval = agent_glasses.forward_pass(img_eval, glasses_batch)
+                if config_dict['run-settings']['run-rotation']:
+                    img_eval = agent_rotation.forward_pass(img_eval)
+                if config_dict['run-settings']['run-super-resolution']:
+                    img_eval = SRgan_forward_pass(img_eval)
+
 
                 for img_index in range(int(len(batch_data_test.cpu()))):
                     output_img = img_eval[img_index].cpu().numpy().transpose(1, 2, 0)
