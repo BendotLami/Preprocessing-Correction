@@ -26,19 +26,6 @@ from ColorCorrectionAgent import *
 from GlassesAgent import *
 from RotationAgent import *
 
-DEFAULT_CONFIG = """
-{
-"color-correction": {
-    "epochs": 100,
-    "batch-size": 64,
-    "learning-rate": 0.002,
-    "lr-scheduler": {
-        "step-size": 800000,
-        "gamma": 0.1
-    }
-}
-}"""
-
 BATCH_SIZE_GLASSES = 16
 BATCH_SIZE_WITHOUT_GLASSES = 16
 
@@ -113,8 +100,8 @@ if __name__ == "__main__":
         with open("./config.json", 'r') as f:
             config_dict = json.load(f)
     except FileNotFoundError:
-        print("Couldn't find config.json, running with default config")
-        config_dict = json.loads(DEFAULT_CONFIG)
+        print("Couldn't find config.json, Aborting.")
+        exit(1)
 
     IMAGE_SIZE = config_dict['run-settings']['image_size']
     CELEB_A_DIR = config_dict['run-settings']['celeb_a_dir']
