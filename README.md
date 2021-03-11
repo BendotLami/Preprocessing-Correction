@@ -22,7 +22,7 @@ At the end of the run, we evaluate the model using the dataset found under `["ru
 The model run the images through all the enabled features, pre-trained or after training.
 
 ## Results
-<table>
+<table style="text-align:center" border="0">
 <tr>
 <td>Color-Corretion results</td>
 <td>Rotation-correction results</td>
