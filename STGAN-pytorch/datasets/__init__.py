@@ -1,1 +1,0 @@
-from .celeba import CelebADataLoader as celeba_loader

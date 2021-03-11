@@ -1,1 +1,0 @@
-from .stgan import STGANAgent
