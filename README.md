@@ -21,9 +21,37 @@ The parameter `pre-trained-path` determines the path to the model weights from p
 At the end of the run, we evaluate the model using the dataset found under `["run-setting"]["eval-dataset-path"]`\
 The model run the images through all the enabled features, pre-trained or after training.
 
+## Results
+<table>
+<tr>
+<td>Color-Corretion results</td>
+<td>Rotation-correction results</td>
+</tr>
+<tr>
+<td>
 
-## Contributing
-placeholder
+![Color-Correction](./examples/color-correction.png)</td>
+<td>
+
+![Rotation-correction](./examples/rotation.png)
+
+</td>
+</tr>
+<tr>
+<td>Super-resolution results</td>
+<td>Glasses results</td>
+</tr>
+<tr>
+<td>
+
+![Super-resolution](./examples/super-resolution.png)</td>
+<td>
+
+![Glasses](./examples/glasses.png)
+
+</td>
+</tr>
+</table>
 
 ## License
 placeholder
