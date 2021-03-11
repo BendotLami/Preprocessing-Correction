@@ -1,6 +1,11 @@
 {
   "run-settings":
   {
+    "run-color-correction": true,
+    "run-glasses": false,
+    "run-rotation": true,
+    "run-super-resolution": true,
+
     "train-color-correction": true,
     "train-glasses": false,
     "train-srresnet": false,
@@ -12,15 +17,10 @@
     "image_size": 256,
     "celeb_a_dir" : "/home/dcor/datasets/CelebAMask-HQ/CelebA-HQ-img/",
     "glasses_npy_dir" : "/home/dcor/ronmokady/workshop21/team4/glasses.npy",
-    "celeb_a_anno" : "/home/dcor/datasets/CelebAMask-HQ/CelebAMask-HQ-attribute-anno.txt",
-
-    "run-color-correction": true,
-    "run-glasses": true,
-    "run-super-resolution": true,
-    "run-rotation": true
+    "celeb_a_anno" : "/home/dcor/datasets/CelebAMask-HQ/CelebAMask-HQ-attribute-anno.txt"
   },
   "color-correction": {
-    "pre-trained-path": "/home/dcor/ronmokady/workshop21/team4/MainProject/ColorCorrectionRun/Model_Weights/weights_70",
+    "pre-trained-path": "/home/dcor/ronmokady/workshop21/team4/MainProject/Final_Project/Model_Weights/ColorCorrection_99",
     "epochs": 100,
     "batch-size": 64,
     "learning-rate": 0.002,
@@ -32,13 +32,13 @@
   "glasses": {
     "generator":
     {
-      "pre-trained-path": "./",
+      "pre-trained-path": "/home/dcor/ronmokady/workshop21/team4/MainProject/Final_Project/Model_Weights/glasses_gen_77",
       "lr": 0.01,
       "step_size": 800000,
       "gamma": 0.1
     },
     "discriminator": {
-      "pre-trained-path": "./",
+      "pre-trained-path": "/home/dcor/ronmokady/workshop21/team4/MainProject/Final_Project/Model_Weights/glasses_disc_77",
       "lr": 0.01,
       "step_size": 800000,
       "gamma": 0.1
