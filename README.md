@@ -15,7 +15,8 @@ The parameters are self-explanatory, or can be found in the PDF.\
 The parameter `pre-trained-path` determines the path to the model weights from previous training, and is taken if `train-###` is set to `false`.
 
 At the end of the run, we evaluate the model using the dataset found under `["run-setting"]["eval-dataset-path"]`\
-The model run the images through all the enabled features, pre-trained o
+The model run the images through all the enabled features.
+
 ## The Models
 
 Pre-trained model weights are available in the server university, the config.json contains the path to the corresponding model weights.\
