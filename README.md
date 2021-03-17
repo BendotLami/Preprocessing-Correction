@@ -22,6 +22,12 @@ The model run the images through all the enabled features.
 Pre-trained model weights are available in the server university, the config.json contains the path to the corresponding model weights.\
 In addition, the weights are available in Google-Drive: https://drive.google.com/drive/folders/13HODDXB4Xa26N6GbHBKFspO8lvAScicY?usp=sharing
 
+The default run disable the glasses model.\r after training.
+
+The pre-trained model is not ideal, this is due to a change in image-size while concatenating the models together.\
+We changed the image size to 256, instead of 144, due to super-sampling input size.\
+The training on image size 256 didn't converge, so we couldn't provide pre-trained weights.\
+The glasses model is available for training, and the network parameters can be changed in `config.json` file.
 
 ## Results
 <table style="text-align:center" border="0">
